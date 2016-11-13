@@ -1,9 +1,13 @@
 from defines import *
 import Queue
+from twisted.internet import reactor
+from twisted.protocols import socks
 
 pivots = []
 pivot_num = 0
 fuck = Queue.Queue()
+
+portfwd_queue = Queue.Queue()
 
 class StoppableThread(threading.Thread):
 	def __init__(self, target):
@@ -108,3 +112,42 @@ def delete_pivot(number):
 			t.stop()
 			pivots.remove(tuple)
 			return "pivot will close on next connection attempt"
+			
+def socks_proxy():
+	reactor.listenTCP(2080,socks.SOCKSv4Factory("./socks.log"))
+	reactor.run()
+			
+def handle_portfwd():
+	current_thread = threading.currentThread()
+	
+	handler_socks_socket = socket.socket()
+	handler_socks_socket.connect(("localhost",8080))
+	
+	local_socks_socket = socket.socket()
+	local_socks_socket.connect(("localhost",2080))
+	
+	while not current_thread.stopped():
+		try:
+			readable, writable, errored = select.select([handler_socks_socket, local_socks_socket], [], [])
+		except Exception as e:
+			print e
+			break
+			
+		if handler_socks_socket in readable:
+			try:
+				local_data = handler_socks_socket.recv(4096)
+				if not local_data: break
+				local_socks_socket.sendall(local_data)
+			except Exception as e:
+				print e
+			
+		if local_socks_socket in readable:
+			try:
+				remote_data = local_socks_socket.recv(4096)
+				if not remote_data: break
+				handler_socks_socket.sendall(remote_data)
+			except Exception as e:
+				print e
+	
+StoppableThread(target=socks_proxy).start()
+StoppableThread(target=handle_portfwd).start()

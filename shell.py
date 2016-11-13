@@ -59,12 +59,17 @@ while True:
 			data = ""
 			#try:
 			data = communication.receive()[:-2] # Receive command from handler and remove marker.
+			
 			if not data:
 				raise Exception("dfgdfgdfgdfg") # Professional programming
 				break
+			
+			if data.startswith("PORTFWD_PACKET"):
+				pivot.portfwd_queue.put_nowait(data)
+				output = "PORTFWD_PACKET:OK"
 				
 			# CHANGE DIRECTORY COMMAND
-			if data.startswith("cd"): # Change directory
+			elif data.startswith("cd"): # Change directory
 				try:
 					os.chdir(data[3:]) 
 					output = ""
