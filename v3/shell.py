@@ -38,34 +38,31 @@ class UserInputHandler(MessageHandler):
 			output = shell_commands.handle_command(data)
 			output += "\n"+os.getcwd()+">"
 			self.send(output)
+			
+class TransmitHandler(MessageHandler): # Pseudo-handler to send data to shell
+	def run(self):
+		while True:
+			comm_socket.sendall(output_queue.get())	
 		
 handlers = []
 user_input_handler = UserInputHandler(chr(1))
+transmit_handler = TransmitHandler(chr(0)) # Create handlers
 handlers.append(user_input_handler)
+handlers.append(transmit_handler)
 
-t = threading.Thread(target=user_input_handler.run)
-t.daemon = True
-t.start()
-
-def data_sender():
-	while True:
-		comm_socket.sendall(output_queue.get())
-				
-t = threading.Thread(target=data_sender)
-t.daemon = True
-t.start()
+for handler in handlers: # Start handlers
+	t = threading.Thread(target=handler.run)
+	t.daemon = True
+	t.start()
 
 while True:
 	data = ""
 	while not data.endswith(marker):
 		data += comm_socket.recv(4096)
 	if not data: break
-	data = data[:-1]
-	print "GOT DATA!!"
+	data = data[:-1] # Get data from shell and remove marker
 	
-	if data.startswith(chr(1)):
-		print "FOR USER INPUT!!"
-		user_input_handler.put(data[1:])
-		
-	elif data.startswith(chr(9)):
-		pass
+	for handler in handlers:
+		if handler.data_prefix == data[0]: # Put data on correct handler's queue
+			handler.put(data[1:])
+			break

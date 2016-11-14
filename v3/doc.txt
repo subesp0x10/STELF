@@ -1,0 +1,18 @@
+Handler - a handler is an object that processes data.
+	Properties:
+		data_prefix: Character appended to start of message to denote which handler should process it.
+		input_queue: Queue of messages to be processed by a handler.
+	Functions:
+		send (data): Places data on queue to be sent to attacker machine.
+		put (data):  Puts data on input queue to be processed.
+		run ():		 Function called upon start of handler. Should be an infinite loop, which takes data from input_queue, processes it and places output on 			 output queue.
+		
+Example flow of data:
+	1. Attacker types in a command such as 'whoami'
+	2. Command is placed on output queue with a prefix of chr(1), denoting it is to be handled by UserInputHandler.
+	3. Transmit handler grabs it from queue and sends it to the shell.
+	4. Shell receives the command, reads the prefix, removes it and places it on UserInputHandler queue.
+	5. Handler grabs the command from queue, executes it, and places output on output_queue with prefix of chr(1) again.
+	6. Transmit handler takes it and sends it back to the attacker.
+	7. Attacker receives it and places the message in UserInputHandler.
+	8. UserInputHandler gets output from its queue and displays it to the attacker.
