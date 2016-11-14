@@ -10,4 +10,4 @@ On the victim host run shell.py
 
 The connect back details are located in defines.py
 
-I have no idea if crypto works.
+I have no idea if crypto works. (it does you dingus)
