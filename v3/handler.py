@@ -15,6 +15,7 @@ server_sock.listen(5)
 
 
 comm_socket, addr = server_sock.accept()
+sys.stdout.write(comm_socket.recv(4096)[:-1])
 
 output_queue = Queue.Queue()
 
@@ -34,7 +35,7 @@ class UserInputHandler(MessageHandler):
 	def run(self):
 		try:
 			while True:
-				user_input = raw_input(">")
+				user_input = raw_input()
 				self.send(user_input)
 				sys.stdout.write(self.input_queue.get())
 		except EOFError:

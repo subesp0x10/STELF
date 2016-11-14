@@ -4,7 +4,7 @@ import Queue
 import os
 import threading
 import time
-import shell_defines
+import shell_commands
 
 marker = chr(255)
 
@@ -35,10 +35,8 @@ class UserInputHandler(MessageHandler):
 			print "trying to get data!"
 			data = self.input_queue.get()
 			
-			if data.startswith("test"):
-				output = shell_defines.test(data)
-			else:
-				output = shell_defines.execute_command(data)
+			output = shell_commands.handle_command(data)
+			output += "\n"+os.getcwd()+">"
 			self.send(output)
 		
 handlers = []
@@ -58,8 +56,11 @@ t.daemon = True
 t.start()
 
 while True:
-	data = comm_socket.recv(4096)[:-1]
+	data = ""
+	while not data.endswith(marker):
+		data += comm_socket.recv(4096)
 	if not data: break
+	data = data[:-1]
 	print "GOT DATA!!"
 	
 	if data.startswith(chr(1)):
