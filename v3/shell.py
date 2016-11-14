@@ -50,7 +50,7 @@ class UserInputHandler(MessageHandler):
 			data = self.input_queue.get()
 			
 			output = shell_commands.handle_command(data)
-			output += "\n"+os.getcwd()+">"
+			output += "\n"+os.getcwd()+">> "
 			self.send(output)
 		
 handlers = []
