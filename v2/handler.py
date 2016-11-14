@@ -21,22 +21,29 @@ EncodeAES = lambda  s: base64.b64encode(aesobj.encrypt(s))
 DecodeAES = lambda  e: aesobj.decrypt(base64.b64decode(e))
 
 def create_socks_proxy():
-	remote_sock_s = socket.socket()
-	remote_sock_s.bind(("0.0.0.0",8080))
-	remote_sock_s.listen(1)
-	
-	local_sock_s = socket.socket()
-	local_sock_s.bind(("0.0.0.0",1080))
-	local_sock_s.listen(1)
 	while True:
+		remote_sock_s = socket.socket()
+		remote_sock_s.bind(("0.0.0.0",8080))
+		remote_sock_s.listen(5)
 		remote_socket, addr = remote_sock_s.accept()
-		print "got local"
-		#local_socket.setblocking(0)
+		print addr
 		
+		local_sock_s = socket.socket()
+		local_sock_s.bind(("0.0.0.0",1080))
+		local_sock_s.listen(5)
+			#local_socket.setblocking(0)
+		try:
+			remote_sock.recv(2048)
+			local_sock.recv(2048)
+			local_socket.close(0)
+			local_socket.shutdown()
+			del local_socket
+		except: pass
 		
+		print "lsitening for client"
 		try:
 			local_socket, addr = local_sock_s.accept()
-			print "got remote"
+			print "someone wants to use our proxy"
 		except Exception as e:
 			print e
 			continue
@@ -45,28 +52,48 @@ def create_socks_proxy():
 			
 		while True:
 			try:
+				print "selecting"
 				readable, writable, errored = select.select([local_socket, remote_socket], [], [])
+				print readable, writable, errored
 			except Exception as e:
+				print "SELECT EXCEPTION"
 				print e
+				break
+				
+			if readable == writable:
+				print "OH SHIT"
 				break
 				
 			if local_socket in readable:
 				try:
 					local_data = local_socket.recv(4096)
+					print local_data
 					if not local_data: break
 					remote_socket.sendall(local_data)
 				except Exception as e:
+					print "LOCAL EXCEPTION"
 					print e
+					break
 				
 			if remote_socket in readable:
 				try:
 					remote_data = remote_socket.recv(4096)
+					print remote_data
 					if not remote_data: break
 					local_socket.sendall(remote_data)
 				except Exception as e:
+					print "REMOTE EXCEPTION"
 					print e
+					break
 					
-threading.Thread(target = create_socks_proxy).start()
+		print "closing"
+		remote_sock_s.close()
+		local_sock_s.close()
+		del remote_sock_s
+		del local_sock_s
+t = threading.Thread(target = create_socks_proxy)
+t.daemon = True
+t.start()
 
 def Send(sock, data):
     if not data:

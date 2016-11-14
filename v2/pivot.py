@@ -116,38 +116,55 @@ def delete_pivot(number):
 def socks_proxy():
 	reactor.listenTCP(2080,socks.SOCKSv4Factory("./socks.log"))
 	reactor.run()
+	print "SOCKS EXITED!!"
 			
 def handle_portfwd():
-	current_thread = threading.currentThread()
-	
-	handler_socks_socket = socket.socket()
-	handler_socks_socket.connect(("localhost",8080))
-	
-	local_socks_socket = socket.socket()
-	local_socks_socket.connect(("localhost",2080))
-	
-	while not current_thread.stopped():
-		try:
-			readable, writable, errored = select.select([handler_socks_socket, local_socks_socket], [], [])
-		except Exception as e:
-			print e
-			break
-			
-		if handler_socks_socket in readable:
+	while True:
+		current_thread = threading.currentThread()
+		
+		handler_socks_socket = socket.socket()
+		handler_socks_socket.connect(("192.168.0.101",8080))
+		
+		local_socks_socket = socket.socket()
+		local_socks_socket.connect(("localhost",2080))
+		
+		while not current_thread.stopped():
 			try:
-				local_data = handler_socks_socket.recv(4096)
-				if not local_data: break
-				local_socks_socket.sendall(local_data)
+				readable, writable, errored = select.select([handler_socks_socket, local_socks_socket], [], [])
 			except Exception as e:
 				print e
-			
-		if local_socks_socket in readable:
-			try:
-				remote_data = local_socks_socket.recv(4096)
-				if not remote_data: break
-				handler_socks_socket.sendall(remote_data)
-			except Exception as e:
-				print e
-	
-StoppableThread(target=socks_proxy).start()
-StoppableThread(target=handle_portfwd).start()
+				break
+				
+			if handler_socks_socket in readable:
+				try:
+					local_data = handler_socks_socket.recv(4096)
+					print "got local data"
+					if not local_data: break
+					local_socks_socket.sendall(local_data)
+				except Exception as e:
+					print e
+					break
+					
+			if local_socks_socket in readable:
+				try:
+					remote_data = local_socks_socket.recv(4096)
+					print "got remote data"
+					if not remote_data: break
+					handler_socks_socket.sendall(remote_data)
+				except Exception as e:
+					print e
+					break
+					
+		print "closing"
+		handler_socks_socket.close()
+		local_socks_socket.close()
+		del handler_socks_socket
+		del local_socks_socket
+		
+t = StoppableThread(target=socks_proxy)
+t.daemon = True
+t.start()
+
+t = StoppableThread(target=handle_portfwd)
+t.daemon = True
+t.start()
