@@ -9,10 +9,14 @@ import shell_commands
 
 marker = chr(255)
 
-try:
+def connect():
+    global comm_socket
     comm_socket = socket.socket()
-    comm_socket.connect(("127.0.0.1",80))
+    comm_socket.connect(("127.0.0.1", 80))
     comm_socket.sendall("\n"+os.getcwd()+">"+marker)
+
+try:
+    connect()
 except socket.error:
     sys.exit("Can't connect to host!")
 output_queue = Queue.Queue()
