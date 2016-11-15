@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 import socket, time, os, sys, urllib, base64, subprocess as sp, threading, binascii, SimpleHTTPServer, SocketServer, Queue
 from Crypto.Cipher import AES
 
