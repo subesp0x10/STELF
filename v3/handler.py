@@ -85,18 +85,24 @@ class MessageWorker: # Base class for adding a message worker
 class UserInputWorker(MessageWorker): # Worker which takes user input and sends it for execution
 	
 	def file_shell_to_handler(self, filename):
-		with open(filename, "wb") as w:
-			while True:
-				data = self.input_queue.get()
-				if data == "EOF": break
-				w.write(base64.b64decode(data))
+		try:
+			with open(filename, "wb") as w:
+				while True:
+					data = self.input_queue.get()
+					if data == "EOF": break
+					w.write(base64.b64decode(data))
+		except Exception as e:
+			print e
 				
 	def file_handler_to_shell(self, filename):
-		with open(filename, "rb") as r:
-			for line in r.readlines():
-				self.send(base64.b64encode(line))
-			self.send("EOF")
-
+		try:
+			with open(filename, "rb") as r:
+				for line in r.readlines():
+					self.send(base64.b64encode(line))
+				self.send("EOF")
+		except Exception as e:
+			print e
+			
 	def run(self):
 		try:
 			while True:

