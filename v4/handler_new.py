@@ -13,8 +13,8 @@ class Handler:
     def send_cmd(self, command):
         return "bitch"
     def start(self):
-        self.client_socket, _ = self.server_sock.accept()
         self.server_sock.listen(5)
+        self.client_socket, _ = self.server_sock.accept()
         while True:
             user_input = raw_input()
             self.client_socket.sendall(user_input)
