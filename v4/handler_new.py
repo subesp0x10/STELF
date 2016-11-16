@@ -7,5 +7,16 @@ class Handler:
 
         self.server_sock = socket.socket()
         self.server_sock.bind((self.bind, self.port))
+        
+        self.client_socket, _ = self.server_sock.accept()
     def start():
         self.server_sock.listen(5)
+        while True:
+            user_input = raw_input()
+            self.client_socket.sendall(user_input)
+            data = self.client_socket.recv(4096)
+            if not data: break
+            sys.stdout.write(data + ">> ")
+
+handler = Handler("0.0.0.0", 8080)
+handler.start()
