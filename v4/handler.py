@@ -64,12 +64,12 @@ class Handler:
 			            sys.stdout.write(data_package["data"])
 			        except Exception as e:
 			            print "[-] Whoooops"
+			            print str(e)
                             except Exception as e:
                                 print "Something went wrong" 
-                                if str(e) == "[Errno 32] Broken pipe":
-                                    print "[-] Broken pipe..."
-                                    print "[*] Attempting reconnection"
-                                    break
+                                print "[-] Broken pipe..."
+                                print "[*] Attempting reconnection"
+                                break
 
                             
 handler = Handler("0.0.0.0", 8080)
