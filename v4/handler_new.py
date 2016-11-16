@@ -8,8 +8,12 @@ class Handler:
         self.server_sock = socket.socket()
         self.server_sock.bind((self.bind, self.port))
         
+        self.commands = []
+        
+    def send_cmd(self, command):
+        return "bitch"
+    def start(self):
         self.client_socket, _ = self.server_sock.accept()
-    def start():
         self.server_sock.listen(5)
         while True:
             user_input = raw_input()
