@@ -6,6 +6,7 @@ server_sock.listen(5)
 
 cli, _ = server_sock.accept()
 sys.stdout.write(">> ")
+
 while True:
 	user_input = raw_input()
 	cli.sendall(user_input)
