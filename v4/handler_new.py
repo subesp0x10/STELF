@@ -19,8 +19,7 @@ class Handler:
             user_input = raw_input()
             self.client_socket.sendall(user_input)
             data = self.client_socket.recv(4096)
-            if not data: break
-            sys.stdout.write(data + ">> ")
+            print data
 
 handler = Handler("0.0.0.0", 8080)
 handler.start()
