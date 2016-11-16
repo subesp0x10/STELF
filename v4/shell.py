@@ -44,7 +44,7 @@ class Shell:
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
-		return output + "\n" + os.getcwd() + ">> "
+		return output
 		
 		
 	def run(self):
