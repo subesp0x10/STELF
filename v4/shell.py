@@ -6,6 +6,11 @@ if os.name == 'nt':
 else:
     pass
 
+def windows_only(func):
+	def tester(junk):
+		if os.name != "nt": return "I'm afraid I cannot let you do that Dave."
+	return tester
+
 class Shell:
 	def __init__(self, handler_ip, handler_port):
 		self.handler_ip = handler_ip
@@ -67,6 +72,10 @@ class Shell:
 		timer.cancel()
 		return out
 		
+	@windows_only
+	def windows_only_thing(self):
+		return "ass"
+		
 	def change_directory(self, dir):
 		try:
 			os.chdir(dir)
@@ -82,7 +91,7 @@ class Shell:
 			pass
 			
 		if command == "test":
-			output = "test successful"
+			output = self.windows_only_thing()
 		elif command == "prompt":
 			if not arguments:
 				output = "Set to one or more values: cwd, ip, data, hostname, username, localtime; or use preset: minimal, small, userathost"
