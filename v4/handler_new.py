@@ -1,4 +1,4 @@
-import socket, sys, json
+import socket, sys, json, base64
 
 class Handler:
     def __init__(self, bind, port):
@@ -21,7 +21,10 @@ class Handler:
             user_input = raw_input()
             self.send_cmd(user_input)
             data = self.client_socket.recv(4096)
-            print json.loads(data)
+            data_package = json.loads(data)
+            for key in data_package:
+                data_package[key] = base64.b64decode(data_package[key])
+            sys.stdout.write(data_package["data"])
 
 handler = Handler("0.0.0.0", 8080)
 handler.start()
