@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 import socket, subprocess, os, threading, json, base64, win32api, datetime, getpass, time
 
 class Shell:
