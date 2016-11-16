@@ -36,6 +36,8 @@ class Handler:
 		self.client_socket, _ = self.server_sock.accept()
 		while True:
 			user_input = raw_input("\n" + self.prompt)
+			if user_input == "help":
+				print "Available commands:\n prompt - change prompt"
 			self.send_cmd(user_input)
 			data = self.client_socket.recv(4096)
 			data_package = json.loads(data)

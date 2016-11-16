@@ -23,8 +23,8 @@ class Shell:
 			self.sent_info = ["data"]
 		elif items == "small":
 			self.sent_info = ["data","cwd"]
-		elif items == "username":
-			self.sent_info = ["data","cwd","username"]
+		elif items == "userathost":
+			self.sent_info = ["data","cwd","username","hostname"]
 		else:
 			self.sent_info = items.split()
 			for item in list(self.sent_info):
@@ -62,7 +62,11 @@ class Shell:
 		return out
 		
 	def change_directory(self, dir):
-		os.chdir(dir)
+		try:
+			os.chdir(dir)
+			return ""
+		except Exception as e:
+			return str(e)
 		
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -73,11 +77,13 @@ class Shell:
 			
 		if command == "test":
 			output = "test successful"
-		elif command == "setinfo":
-			output = self.set_package_items(arguments)
+		elif command == "prompt":
+			if not arguments:
+				output = "Set to one or more values: cwd, ip, data, hostname, username, localtime; or use preset: minimal, small, userathost"
+			else:
+				output = self.set_package_items(arguments)
 		elif command == "cd":
-			self.change_directory(arguments)
-			output = ""
+			output = self.change_directory(arguments)
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
