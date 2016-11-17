@@ -53,7 +53,9 @@ class Client:
 		while True:
 			try:
 				user_input = raw_input("\n" + self.prompt + " ")
-			except KeyboardInterrupt: break
+			except KeyboardInterrupt:
+			    print ""
+			    break
 			if user_input == "help":
 				print "Available commands:\n prompt - change prompt"
 			else:
