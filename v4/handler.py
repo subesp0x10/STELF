@@ -154,6 +154,9 @@ class Handler:
 					self.clients[req_id].interact()
 				except Exception as e:
 					print e
+					
+			elif user_input == "exit":
+				sys.exit("\n[*]User requested shutdown.")
 
 
 	# def interface(self):
