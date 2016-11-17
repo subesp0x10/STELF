@@ -53,7 +53,9 @@ class Client:
 		while True:
 			try:
 				user_input = raw_input("\n" + self.prompt + " ")
-			except KeyboardInterrupt: break
+			except KeyboardInterrupt:
+			    print ""
+			    break
 			if user_input == "help":
 				print "Available commands:\n prompt - change prompt"
 			else:
@@ -132,7 +134,7 @@ class Handler:
 			self.clients.append(c)
 			
 	def start(self):
-		print "start"
+		print "[*] STELF HAS STARTED BABY"
 		t = threading.Thread(target=self.accept_clients)
 		t.daemon = True
 		t.start()
@@ -157,6 +159,7 @@ class Handler:
 					
 			elif user_input == "exit":
 				sys.exit("\n[*]User requested shutdown.")
+
 
 
 	# def interface(self):
