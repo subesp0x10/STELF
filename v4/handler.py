@@ -164,7 +164,7 @@ class Handler:
 			
 			if not self.interacting:
 				sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-				print "[*]STELF session "+str(c.id)+" opened ("+c.address+":"+str(c.port)+" -> "+self.bind+":"+str(self.port)+")\n"
+				print "[*] STELF session "+str(c.id)+" opened ("+c.address+":"+str(c.port)+" -> "+self.bind+":"+str(self.port)+")\n"
 				sys.stdout.write('handler>> ' + readline.get_line_buffer())
 				sys.stdout.flush()
 			
@@ -176,7 +176,7 @@ class Handler:
 		while True:
 			try:
 				user_input = raw_input(u"handler>> ")
-			except KeyboardInterrupt: sys.exit("\n[*]User requested shutdown.")
+			except KeyboardInterrupt: sys.exit("\n[*] User requested shutdown.")
 			if user_input == "list" or user_input == "l":
 				print "Current active sessions:"
 				print "========================"
@@ -196,7 +196,7 @@ class Handler:
 					print e
 					
 			elif user_input == "exit":
-				sys.exit("\n[*]User requested shutdown.")
+				sys.exit("\n[*] User requested shutdown.")
 							
 handler = Handler("0.0.0.0", 8080)
 handler.start()
