@@ -51,7 +51,9 @@ class Client:
 	def interact(self):
 		print "starting interaction"
 		while True:
-			user_input = raw_input("\n" + self.prompt + " ")
+			try:
+				user_input = raw_input("\n" + self.prompt + " ")
+			except KeyboardInterrupt: break
 			if user_input == "help":
 				print "Available commands:\n prompt - change prompt"
 			else:
@@ -137,8 +139,12 @@ class Handler:
 		while True:
 			user_input = raw_input("handler>> ")
 			if user_input == "list":
+				print "Current active sessions:"
+				print "========================"
 				for c in self.clients:
 					print "["+str(c.id)+"]: " + c.address + ":" + str(c.port)
+					
+				print"\n========================"
 					
 			elif user_input.startswith("interact"):
 				try:
