@@ -64,8 +64,21 @@ class Client:
 							
 		self.prompt = self.prompt.strip()
 		
+	def tab_completer(self, text, state):
+		self.send("LIST_FILES "+text)
+		data = self.recv()
+		data_package = json.loads(data)
+		for key in data_package:
+			data_package[key] = base64.b64decode(data_package[key])
+		files = data_package["data"].split("|")
+		return str(files[state])
+		
 	def interact(self):
 		print "starting interaction"
+
+		readline.parse_and_bind("tab: complete")
+		readline.set_completer(self.tab_completer)
+		
 		while True:
 			try:
 				user_input = raw_input(u"\n" + unicode(self.prompt, errors='ignore') + " ")
@@ -76,6 +89,7 @@ class Client:
 				print "Available commands:\n prompt - change prompt"
 			else:
 				try:
+					if not user_input: continue
 					self.send(user_input)
 					
 					data = self.recv()

