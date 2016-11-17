@@ -26,7 +26,7 @@ class Shell:
 		
 	def get_data(self):
 		data = self.comm_socket.recv(4096)
-		if not data: raise Exception("Handler disconnected")
+		if not data: raise Exception("[*] Handler disconnected")
 		return data
 		
 	def set_package_items(self, items):
