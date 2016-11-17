@@ -54,7 +54,7 @@ class Client:
 		print "starting interaction"
 		while True:
 			try:
-                            user_input = prompt(u"\n" + self.prompt + " ")
+				user_input = prompt(u"\n" + unicode(self.prompt, errors='replace') + " ")
 			except KeyboardInterrupt:
 			    print ""
 			    break
