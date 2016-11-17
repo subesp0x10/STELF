@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
-import socket, sys, json, base64, random, hashlib, signal, threading, time
+import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib
 from prompt_toolkit import prompt
 from Crypto.Cipher import AES
 import readline
@@ -23,10 +23,16 @@ class Client:
 		self.prompt = self.cwd + ">>"
 		
 	def encrypt(self, data):
-		return base64.b64encode(self.aes_obj.encrypt(data))
+		return base64.b64encode(self.compress(self.aes_obj.encrypt(data)))
 		
 	def decrypt(self, data):
-		return self.aes_obj.decrypt(base64.b64decode(data))
+		return self.aes_obj.decrypt(self.decompress(base64.b64decode(data)))
+		
+	def compress(self, data):
+		return zlib.compress(data, 9)
+		
+	def decompress(self, data):
+		return zlib.decompress(data)
 		
 	def send(self, data):
 		self.sock.sendall(self.encrypt(data))
