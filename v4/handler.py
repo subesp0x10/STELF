@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
+from __future__ import unicode_literals
 import socket, sys, json, base64, random, hashlib, signal, threading, time
+from prompt_toolkit import prompt
 from Crypto.Cipher import AES
 
 class Client:
@@ -52,7 +54,7 @@ class Client:
 		print "starting interaction"
 		while True:
 			try:
-				user_input = raw_input("\n" + self.prompt + " ")
+				user_input = prompt("\n" + self.prompt + " ")
 			except KeyboardInterrupt:
 			    print ""
 			    break
@@ -140,7 +142,7 @@ class Handler:
 		t.start()
 		while True:
 			try:
-				user_input = raw_input("handler>> ")
+				user_input = prompt("handler>> ")
 			except KeyboardInterrupt: sys.exit("\n[*]User requested shutdown.")
 			if user_input == "list":
 				print "Current active sessions:"
