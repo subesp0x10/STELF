@@ -91,7 +91,11 @@ class Shell:
 		self.comm_socket.sendall(data_package)
 		
 	def kill_proc(self, pid):
-		psutil.Process(pid).terminate()
+		print "kill proc firing"
+		process = psutil.Process(pid)
+		for proc in process.children(recursive=True):
+			proc.terminate()
+		process.terminate()
 		
 	def execute_shell_command(self, command):
 		proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)

