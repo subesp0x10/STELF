@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
 import socket, sys, json, base64, random, hashlib, signal, threading, time
 from prompt_toolkit import prompt
