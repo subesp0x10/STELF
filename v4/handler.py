@@ -103,8 +103,8 @@ class Client:
 					sys.stdout.write(data_package["data"])
 				
 				except Exception as e:
-						print "Something went wrong" 
 						print e
+						del handler.clients[self.id]
 						break
 		
 

