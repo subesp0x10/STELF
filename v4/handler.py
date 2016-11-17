@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
 import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib
-from prompt_toolkit import prompt
 from Crypto.Cipher import AES
 import readline
 
@@ -35,13 +34,16 @@ class Client:
 		return zlib.decompress(data)
 		
 	def send(self, data):
-		self.sock.sendall(self.encrypt(data))
+		self.sock.sendall(self.encrypt(data)+chr(255))
 		
 	def recv(self):
 		self.sock.settimeout(70)
 		try:
-			data = self.sock.recv(4096)		
-			if not data: raise Exception("[-] Client Disconnected")
+			data = ""
+			while not data.endswith(chr(255)):
+				c = self.sock.recv(4096)
+				if not c: raise Exception("[-] Client Disconnected")
+				data += c
 		except Exception as e:
 			self.sock.settimeout(None)
 			raise Exception("[-]Client Disconnected")

