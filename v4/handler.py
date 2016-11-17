@@ -134,7 +134,7 @@ class Handler:
 			self.clients.append(c)
 			
 	def start(self):
-		print "start"
+		print "[*] STELF HAS STARTED BABY"
 		t = threading.Thread(target=self.accept_clients)
 		t.daemon = True
 		t.start()
@@ -155,7 +155,7 @@ class Handler:
 					req_id = int(user_input.split()[1])
 					self.clients[req_id].interact()
 				except Exception as e:
-					print e
+                                    print e
 
 
 	# def interface(self):
