@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
-import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib, Queue
+import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib, Queue, select
 from Crypto.Cipher import AES
 import readline
 
@@ -76,7 +76,7 @@ class Client:
 		return str(files[state])
 		
 	def socks_proxy(self):
-
+	
 		self.local_proxy_socket = socket.socket()
 		self.local_proxy_socket.bind(("0.0.0.0", 3080))
 		self.local_proxy_socket.listen(5)
@@ -85,9 +85,8 @@ class Client:
 		self.remote_proxy_socket.bind(("0.0.0.0", 4080))
 		self.remote_proxy_socket.listen(5)
 		
-		remote_socket, addr = self.remote_proxy_socket.accept()
-		
 		while True:
+			remote_socket, addr = self.remote_proxy_socket.accept()
 			local_socket, addr = self.local_proxy_socket.accept()
 			
 			while True:
@@ -101,6 +100,7 @@ class Client:
 					try:
 						local_data = local_socket.recv(4096)
 						if not local_data: break
+						print local_data
 						remote_socket.sendall(local_data)
 					except Exception as e:
 						print e
@@ -110,10 +110,16 @@ class Client:
 					try:
 						remote_data = remote_socket.recv(4096)
 						if not remote_data: break
+						print remote_data
 						local_socket.sendall(remote_data)
 					except Exception as e:
 						print e
 						break
+						
+			local_socket.close()
+			remote_socket.close()
+						
+			
 		
 	def create_socks_proxy(self):
 		t = threading.Thread(target=self.socks_proxy)
