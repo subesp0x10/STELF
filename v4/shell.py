@@ -153,7 +153,7 @@ class Shell:
 	def run(self):
 		while True:
 			data = self.get_data()
-			print data
+			if not data.startswith("LIST_FILES"): print data
 			output = self.handle_command(data)
 			self.send_data(output)
 			
