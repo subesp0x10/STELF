@@ -2,6 +2,24 @@
 import socket, sys, json, base64, random, hashlib, signal
 from Crypto.Cipher import AES
 
+class Client:
+	def __init__(self, socket, address, port, key, IV):
+		self.sock = socket
+		self.address = addres
+		self.port = port
+		
+		self.enc_key = key
+		self.enc_IV = IV
+		
+	def encrypt(self, data):
+		return base64.b64encode(self.aes_obj.encrypt(data))
+		
+	def decrypt(self, data):
+		return self.aes_obj.decrypt(base64.b64decode(data))
+		
+	def send(self, data):
+		self.sock.sendall(self.encrypt(command))
+		
 class Handler:
 	def __init__(self, bind, port):
 		self.bind = bind
@@ -13,6 +31,7 @@ class Handler:
 		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 		self.server_sock.bind((self.bind, self.port))
+		self.server_sock.listen(5)
 
 		self.commands = []
 		signal.signal(signal.SIGINT, self.signal_handler)
@@ -35,11 +54,6 @@ class Handler:
 		
 		return key, IV
 		
-	def encrypt(self, data):
-		return base64.b64encode(self.aes_obj.encrypt(data))
-		
-	def decrypt(self, data):
-		return self.aes_obj.decrypt(base64.b64decode(data))
 	  
 	def signal_handler(self, signal, frame):
 		print "\n\rBye Bye!"
@@ -65,9 +79,8 @@ class Handler:
 							
 		self.prompt = self.prompt.strip()
 		
-	def start(self):
+	def accept_clients(self):
 		while True:
-			self.server_sock.listen(5)
 			self.client_socket, _ = self.server_sock.accept()
 				
 			key, IV = self.gen_diffie_key()
