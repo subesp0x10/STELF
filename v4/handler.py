@@ -137,7 +137,9 @@ class Handler:
 		t.daemon = True
 		t.start()
 		while True:
-			user_input = raw_input("handler>> ")
+			try:
+				user_input = raw_input("handler>> ")
+			except KeyboardInterrupt: sys.exit("\n[*]User requested shutdown.")
 			if user_input == "list":
 				print "Current active sessions:"
 				print "========================"
