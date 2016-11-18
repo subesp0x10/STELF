@@ -115,7 +115,6 @@ class Client:
 					try:
 						local_data = local_socket.recv(4096)
 						if not local_data: break
-						print local_data
 						remote_socket.sendall(local_data)
 					except Exception as e:
 						print e
@@ -125,14 +124,13 @@ class Client:
 					try:
 						remote_data = remote_socket.recv(4096)
 						if not remote_data: break
-						print remote_data
 						local_socket.sendall(remote_data)
 					except Exception as e:
 						print e
 						break
 						
 			local_socket.close()
-						
+			remote_socket.close()
 			
 		
 	def create_socks_proxy(self):
