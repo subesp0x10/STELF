@@ -51,7 +51,7 @@ class Client:
 		self.aes_obj = AES.new(self.enc_key, AES.MODE_CFB, self.enc_IV)
 		
 		self.cwd = GOOD + "Starting interaction with "+str(self.id)+" "
-		self.prompt = self.cwd + ">> "
+		self.prompt = self.cwd + ">>"
 		
 		self.threads = []
 		
