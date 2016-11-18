@@ -158,7 +158,7 @@ class Client:
 				try:
 					if not user_input: continue
 					
-					if user_input.startswith("startproxy"):
+					if user_input.startswith("proxy start"):
 						self.create_socks_proxy()
 					self.send(user_input)
 					
