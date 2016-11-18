@@ -5,6 +5,18 @@ import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib
 from Crypto.Cipher import AES
 import readline
 
+class StoppableThread(threading.Thread):
+	def __init__(self, target):
+		super(StoppableThread, self).__init__()
+		self.run = target
+		self._stop = threading.Event()
+		
+	def stop(self):
+		self._stop.set()
+		
+	def stopped(self):
+		return self._stop.isSet()
+
 class Client:
 	def __init__(self, id, socket, address, port, key, IV):
 		self.id = id
@@ -76,6 +88,7 @@ class Client:
 		return str(files[state])
 		
 	def socks_proxy(self):
+		current_thread = threading.currentThread()
 	
 		self.local_proxy_socket = socket.socket()
 		self.local_proxy_socket.bind(("0.0.0.0", 3080))
@@ -85,11 +98,13 @@ class Client:
 		self.remote_proxy_socket.bind(("0.0.0.0", 4080))
 		self.remote_proxy_socket.listen(5)
 		
-		while True:
-			remote_socket, addr = self.remote_proxy_socket.accept()
+		remote_socket, addr = self.remote_proxy_socket.accept()
+		
+		while not current_thread.stopped():
+			
 			local_socket, addr = self.local_proxy_socket.accept()
 			
-			while True:
+			while not current_thread.stopped():
 				try:
 					readable, writable, errored = select.select([local_socket, remote_socket], [], [])
 				except Exception as e:
@@ -117,12 +132,11 @@ class Client:
 						break
 						
 			local_socket.close()
-			remote_socket.close()
 						
 			
 		
 	def create_socks_proxy(self):
-		t = threading.Thread(target=self.socks_proxy)
+		t = StoppbaleThread(target=self.socks_proxy)
 		t.daemon = True
 		t.start()
 		
