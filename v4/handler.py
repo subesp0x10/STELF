@@ -136,7 +136,7 @@ class Client:
 			
 		
 	def create_socks_proxy(self):
-		t = StoppbaleThread(target=self.socks_proxy)
+		t = StoppableThread(target=self.socks_proxy)
 		t.daemon = True
 		t.start()
 		
