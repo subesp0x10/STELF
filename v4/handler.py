@@ -112,17 +112,17 @@ class Client:
 	def socks_proxy(self):
 		current_thread = threading.currentThread()
 	
-		self.local_proxy_socket = socket.socket()
-		self.local_proxy_socket.bind(("0.0.0.0", 3080))
-		self.local_proxy_socket.listen(5)
+		local_proxy_socket = socket.socket()
+		local_proxy_socket.bind(("0.0.0.0", 3080))
+		local_proxy_socket.listen(5)
 		
-		self.remote_proxy_socket = socket.socket()
-		self.remote_proxy_socket.bind(("0.0.0.0", 4080))
-		self.remote_proxy_socket.listen(5)
+		remote_proxy_socket = socket.socket()
+		remote_proxy_socket.bind(("0.0.0.0", 4080))
+		remote_proxy_socket.listen(5)
 		
 		while not current_thread.stopped():
-			remote_socket, addr = self.remote_proxy_socket.accept()
-			local_socket, addr = self.local_proxy_socket.accept()
+			remote_socket, addr = remote_proxy_socket.accept()
+			local_socket, addr = local_proxy_socket.accept()
 			
 			while not current_thread.stopped():
 				try:
@@ -152,6 +152,9 @@ class Client:
 			local_socket.close()
 			remote_socket.close()
 			
+		local_proxy_socket.close()
+		remote_proxy_socket.close()
+			
 		
 	def create_socks_proxy(self):
 		t = StoppableThread(target=self.socks_proxy)
@@ -162,6 +165,16 @@ class Client:
 	def stop_socks_proxy(self):
 		for t in self.threads:
 			t.stop()
+		try:
+			s = socket.socket()
+			s.connect(("localhost",3080))
+			s.close()
+		except: pass
+		try:
+			s = socket.socket()
+			s.connect(("localhost",4080))
+			s.close()
+		except: pass
 		
 	def interact(self):
 		readline.parse_and_bind("tab: complete")
@@ -189,7 +202,7 @@ class Client:
 					
 					if user_input.startswith("proxy start"):
 						self.create_socks_proxy()
-					elif user_input.startswith("proxy start"):
+					elif user_input.startswith("proxy stop"):
 						self.stop_socks_proxy()
 					self.send(user_input)
 					

