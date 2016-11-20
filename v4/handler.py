@@ -188,14 +188,16 @@ class Client:
 			    break
 			if user_input == "help":
 				print INFO + "Available commands:"
-				print " - prompt - Modify the prompt aesthetics,"
-				print " - crash - Crash the shell like Ayrton Senna,"
-				print " - test - Test the connection like a baws,"
-				print " - proxy [start] - Start the always running proxy WARNING: Does not stop! Ever!"
-				print " - dumpff - Dump Firefox Credientials,"
-				print " - dumpchrome - Dump Chrome Credientials."
+				print " - prompt - Modifies the prompt aesthetics."
+				print " - crash - Crashes the shell like Ayrton Senna."
+				print " - test - Returns 'ass' on windows."
+				print " - proxy [start|stop] - Starts or stops socks4 proxy."
+				print " - dumpff - Dumps Firefox Credientials."
+				print " - dumpchrome - Dumps Chrome Credientials."
 				print " - isadmin - Prints whether the current process has admin privileges."
 				print " - bypassuac - Attempts to bypass UAC."
+				print " - getsystem - If current user is an admin, attempts to get system privileges."
+				print " - portscan [hosts] [ports] - Scans given hosts and ports."
 			else:
 				try:
 					if not user_input: continue
