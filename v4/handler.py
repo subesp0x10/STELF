@@ -21,9 +21,9 @@ raw_input1 = raw_input
 __builtin__.raw_input = raw_input2 
 
 
-INFO = Style.BRIGHT + Fore.BLUE + "\n[*] "
-BAD = Style.BRIGHT + Fore.RED + "\n[-] "
-GOOD = Style.BRIGHT + Fore.GREEN + "\n[+] "
+INFO = Style.BRIGHT + Fore.BLUE + "\n[*] " + Style.RESET_ALL
+BAD = Style.BRIGHT + Fore.RED + "\n[-] " + Style.RESET_ALL
+GOOD = Style.BRIGHT + Fore.GREEN + "\n[+] " + Style.RESET_ALL
 
 class StoppableThread(threading.Thread):
 	def __init__(self, target):
