@@ -7,12 +7,9 @@ import dumpff
 if os.name =="nt":
 	import dumpchrome, win32net, pupy_privesc
 
-<<<<<<< HEAD
-HANDLER_IP = "192.168.1.78"
-=======
+
 HANDLER_IP = "127.0.0.1"
 c = wmi.WMI()
->>>>>>> bdd98073bc6d8455e55b45b943ad717cca5d0917
 
 def windows_only(func):
 	def tester(*args):
