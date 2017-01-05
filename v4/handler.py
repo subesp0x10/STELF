@@ -1,8 +1,9 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 # from __future__ import unicode_literals
-import socket, sys, json, base64, random, hashlib, signal, threading, time, zlib, Queue, select, os
+import socket, sys, json, base64, hashlib, signal, threading, time, zlib, Queue, select, os
 from Crypto.Cipher import AES
+from Crypto.Random import random
 from colorama import init, Fore, Style
 import readline
 

