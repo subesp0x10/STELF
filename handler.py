@@ -1,6 +1,5 @@
 import socket
 import Queue
-import subprocess
 import os
 import threading
 import logging
@@ -251,9 +250,11 @@ class Handler:
 			
 			id = self.current_id
 			self.current_id += 1
+			
 			aes = self.dh_exchange(cli)
 			c = Client(id, cli, address, port, aes)
 			self.clients.append(c)
+			
 			if not self.interacting:
 				sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 				print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
@@ -266,8 +267,10 @@ class Handler:
 		t.start()
 		while True:
 			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
-			except KeyboardInterrupt: print GOOD + "Bye!"
-			
+			except KeyboardInterrupt:
+				print GOOD + "Bye!"
+				os._exit(0) # What is a graceful exit
+				
 			if user_input == "list" or user_input == "l":
 				print INFO + "Current active sessions:"
 				print "========================"
