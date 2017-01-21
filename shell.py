@@ -6,6 +6,11 @@ import threading
 import logging
 import time
 import psutil
+from Crypto.Cipher import AES
+from Crypto.Random import random
+import zlib
+import base64
+import hashlib
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
@@ -78,6 +83,8 @@ class Transport:
 			self.comm_socket.connect((self.handler_ip, self.handler_port))
 			logging.info("Connected!")
 			
+			self.aes_obj = self.dh_exchange()
+			
 			for f in [self.sender_loop, self.receiver_loop, self.signal_processor]:
 				t = StoppableThread(target=f)
 				t.daemon = True
@@ -87,9 +94,38 @@ class Transport:
 		except Exception as e:
 			logging.warn("Failed to connect to handler: "+str(e))
 			return False
+			
+	def dh_exchange(self):
+		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
+		base = 2
+		
+		logging.debug("Starting key exchange.")
+		private_key = random.randint(10**(255), (10**256)-1)
+		public_key = pow(base, private_key, modulus)
+		
+		self.comm_socket.sendall(str(public_key))
+		server_key = self.comm_socket.recv(4096)
+		
+		sharedSecret = pow(int(server_key), private_key, modulus)
+		
+		hash = str(hashlib.sha256(str(sharedSecret)).hexdigest())
+		key = hash[:32]
+		IV = hash[-16:]
+		
+		logging.info("Key: "+key+", IV: "+IV)
+		
+		return AES.new(key, AES.MODE_CFB, IV)
+			
+	def encrypt(self, data):
+		return base64.b64encode(zlib.compress(self.aes_obj.encrypt(data), 9))
+		
+	def decrypt(self, data):
+		return self.aes_obj.decrypt(zlib.decompress(base64.b64decode(data)))
 		
 	def send(self, data):
-		self.comm_socket.sendall(data)
+		data = self.encrypt(data)
+		try: self.comm_socket.sendall(data)
+		except: pass
 		
 	def recv(self):
 		if self.disconnected: return ""
@@ -99,7 +135,7 @@ class Transport:
 			logging.error("Handler disconnected")
 			self.comm_socket.close()
 			return self.user_channel.id+"CONN_LOST"
-		return data
+		return self.decrypt(data)
 		
 	def sender_loop(self):
 		ct = threading.currentThread()
