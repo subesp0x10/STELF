@@ -82,10 +82,11 @@ class Transport:
 	""""
 	Used to transfer data between the handler and a client.
 	"""
-	def __init__(self, sock, addr, port, id, aes_obj):
+	def __init__(self, sock, addr, port, id, aes_obj, client):
 		self.client_id = id
 		self.address = addr
 		self.port = port
+		self.client = client
 		
 		self.comm_socket = sock
 		
@@ -151,8 +152,13 @@ class Transport:
 		ct = threading.currentThread()
 		while not ct.stopped():
 			signal = self.signal_channel.read_input()
+			logging.info("Got signal: "+signal)
 			if signal == "CREATE_CHANNEL":
 				pass
+				
+	def signal(self, data):
+		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data)
+		self.master_queue.put(chr(254)+data)
 				
 	def create_channel(self, id):
 		self.channels[id] = Channel(id, self.master_queue)
@@ -162,7 +168,7 @@ class Client:
 	Represents a connected client.
 	"""
 	def __init__(self, id, cli, ip, port, aes_obj):
-		self.transport = Transport(cli, ip, port, id, aes_obj)
+		self.transport = Transport(cli, ip, port, id, aes_obj, self)
 		self.id = id
 		
 	def send(self, data):
@@ -170,6 +176,9 @@ class Client:
 		
 	def recv(self):
 		return self.transport.user_channel.read_input()
+		
+	def signal(self, data):
+		return self.transport.signal(data)
 	
 	def interact(self):
 		logging.info("Starting interaction with client #"+str(self.id))
@@ -182,8 +191,9 @@ class Client:
 				user_input = raw_input()
 			except KeyboardInterrupt:
 				print "\nBackgrounding session."
-				return
+				return True
 			logging.debug("Got user input: "+user_input)
+
 			self.send(user_input)
 			
 			data = self.recv()
@@ -191,6 +201,9 @@ class Client:
 			if data == "CONN_LOST":
 				print "Client Disconnected"
 				return False
+			elif data.startswith("BG_NEW_SESH"):
+				print "A new session should appear within 30 seconds."
+				return True
 			sys.stdout.write(data)
 		
 class Handler:
@@ -252,7 +265,8 @@ class Handler:
 		t.daemon = True
 		t.start()
 		while True:
-			user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
+			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
+			except KeyboardInterrupt: print GOOD + "Bye!"
 			
 			if user_input == "list" or user_input == "l":
 				print INFO + "Current active sessions:"
@@ -269,6 +283,7 @@ class Handler:
 				except:
 					print BAD + "No such client."
 					continue
-				the_chosen_one.interact()
+				if not the_chosen_one.interact(): self.clients.remove(the_chosen_one)
+				self.interacting = False
 		
 Handler("0.0.0.0",8080).run()
