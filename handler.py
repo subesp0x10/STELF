@@ -164,7 +164,25 @@ class Handler:
 	
 		self.clients = []
 		
-	def run(self):
-		pass #will finish after the gitening
+	def accepter(self):
+		ct = threading.currentThread()
+		while not ct.stopped():
+			cli, addr = self.sock.accept()
+			ip, port = addr
+			
+			client = Client(len(self.clients), cli, ip, port)
+			self.clients.append(client)
+			print "new client!"
 		
-Handler("0.0.0.0",8080)
+	def run(self):
+		t = StoppableThread(target=self.accepter)
+		t.daemon = True
+		t.start()
+		while True:
+			user_input = raw_input("prompt>")
+			if user_input == "l": print self.clients
+			elif user_input.startswith("i"):
+				the_chosen_one = self.clients[int(user_input.split()[1])]
+				the_chosen_one.interact()
+		
+Handler("0.0.0.0",8080).run()
