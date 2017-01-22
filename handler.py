@@ -236,10 +236,13 @@ class Client:
 	"""
 	Represents a connected client.
 	"""
-	def __init__(self, id, cli, ip, port, aes_obj):
+	def __init__(self, id, cli, ip, port, aes_obj, hostname, admin):
 		self.transport = Transport(cli, ip, port, id, aes_obj, self)
 		self.id = id
 		self.proxy_listener = None
+			
+		self.hostname = hostname
+		self.admin_privs = admin
 		
 	def send(self, data):
 		self.transport.user_channel.write_output(data)
@@ -278,7 +281,7 @@ class Client:
 				print BAD + "Client Disconnected"
 				return False
 			elif data.startswith("BG_NEW_SESH"):
-				print GOOD + "A new session should appear within 30 seconds."
+				print GOOD + "A new session should appear within 30 seconds. (Try checking, it might have already connected!)"
 				return True
 
 			data = data.replace("[-]", BAD).replace("[+]", GOOD).replace("[*]", INFO)
@@ -324,26 +327,31 @@ class Handler:
 	def accepter(self):
 		ct = threading.currentThread()
 		while not ct.stopped():
-			cli, addr = self.sock.accept()
-			logging.info("New client connection")
-			address, port = addr
-			
-			id = self.current_id
-			self.current_id += 1
-			
-			data = cli.recv(4096)
-			logging.debug(data)
-			if data.startswith("GET"): continue
-			
-			aes = self.dh_exchange(cli)
-			c = Client(id, cli, address, port, aes)
-			self.clients.append(c)
-			
-			if not self.interacting:
-				sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-				print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
-				sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
-				sys.stdout.flush()
+			try:
+				cli, addr = self.sock.accept()
+				logging.info("New client connection")
+				address, port = addr
+				
+				id = self.current_id
+				self.current_id += 1
+				
+				data = cli.recv(4096)
+				logging.debug(data)
+				if data.startswith("GET"): continue
+				
+				aes = self.dh_exchange(cli)
+				
+				hostname, admin = cli.recv(4096).split("|")
+				c = Client(id, cli, address, port, aes, hostname, admin)
+				self.clients.append(c)
+				
+				if not self.interacting:
+					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
+					print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
+					sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
+					sys.stdout.flush()
+			except Exception as e:
+				logging.info("A client connected, but disconnected before finishing the handshake.")
 		
 	def run(self):
 		t = StoppableThread(target=self.accepter)
@@ -359,7 +367,7 @@ class Handler:
 				print INFO + "Current active sessions:"
 				print "========================"
 				for c in self.clients:
-					print "["+str(c.id)+"]: " + c.transport.address + ":" + str(c.transport.port)
+					print "["+str(c.id)+"]: " + c.transport.address + ":" + str(c.transport.port)+" Hostname: "+c.hostname+", Admin: "+c.admin_privs
 					
 				print "========================"
 				

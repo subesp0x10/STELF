@@ -166,7 +166,12 @@ class Transport:
 			self.comm_socket.connect((self.handler_ip, self.handler_port))
 			logging.info("Connected!")
 			self.comm_socket.sendall(chr(255)*30)
-			self.aes_obj = self.dh_exchange()
+			time.sleep(random.randint(1,5)) # Waiting a random amount of time since multiple clients
+			self.aes_obj = self.dh_exchange() # connecting at the exact same time causes the handler to hang
+			
+			data = socket.gethostname()+"|"+str(misc.isadmin())
+			
+			self.comm_socket.sendall(data)
 			
 			for f in [self.sender_loop, self.receiver_loop, self.signal_processor]:
 				t = StoppableThread(target=f)
