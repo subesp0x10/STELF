@@ -73,7 +73,73 @@ class Channel:
 		self.output_queue.put(chr(254)+data)
 		
 	def __repr__(self):
-		print "Channel ID: "+str(ord(id))
+		return "Channel ID: "+str(ord(self.id))
+		
+	def __str__(self):
+		return self.__repr__()
+		
+class ProxyConnection:
+	"""
+	This class is used to create a socksv4 proxy, to forward connections from the handler's to shell's network.
+	"""
+	def __init__(self, channel):
+		self.channel = channel
+		logging.info("Creating new proxy connection. "+repr(self.channel))
+		
+		t = StoppableThread(target=self.start)
+		t.daemon = True
+		t.start()
+		
+	def start(self):
+		logging.debug("Proxy connection starting.")
+		data = self.channel.read_input()
+		version, type, remote_port, remote_host, user_id = ord(data[0]), ord(data[1]), data[2:4], data[4:8], data[8:-1]
+		if version != 4 or type != 1:
+			self.send("\x00\x5B\x00\x00\x00\x00\x00\x00")
+			return
+			
+		port1, port2 = ord(remote_port[0]), ord(remote_port[1])
+		self.remote_port = int(str(hex(port1)[2:].zfill(2))+str(hex(port2)[2:].zfill(2)), 16)
+		self.remote_host = ".".join([str(ord(remote_host[i])) for i in range(4)])
+		
+		self.remote_socket = socket.socket()
+		self.remote_socket.settimeout(20)
+		self.connect()
+		
+	def send(self, data):
+		self.channel.write_output(data)
+		
+	def connect(self):
+		try:
+			logging.info("Proxy connection on channel #"+str(self.channel.id)+": Connecting to "+str(self.remote_host)+":"+str(self.remote_port)+"...")
+			self.remote_socket.connect((self.remote_host, self.remote_port))
+			logging.info("Connection successful!")
+			self.remote_socket.settimeout(None)
+		except:
+			logging.info("Connection failed.")
+			self.send("\x00\x5B\x00\x00\x00\x00\x00\x00")
+			return
+
+		self.send("\x00\x5A\x00\x00\x00\x00\x00\x00")
+		self.relay()
+		
+	def reader(self):
+			while True:
+				data = self.remote_socket.recv(8192)
+				if not data:
+					return
+				self.send(data)
+			
+	def writer(self):
+			while True:
+				data = self.channel.read_input()
+				self.remote_socket.sendall(data)
+		
+	def relay(self):
+		for f in [self.reader, self.writer]:
+			t = StoppableThread(target=f)
+			t.daemon = True
+			t.start()
 	
 class Transport:
 	""""
@@ -184,8 +250,10 @@ class Transport:
 		while not ct.stopped():
 			signal = self.signal_channel.read_input()
 			logging.info("Got signal: "+signal)
-			if signal == "CREATE_CHANNEL":
-				pass
+			if signal.startswith("CREATE_CHANNEL"):
+				self.create_channel(signal.split(":")[1])
+			elif signal.startswith("CREATE_PROXY"):
+				ProxyConnection(self.channels[signal.split(":")[1]])
 				
 	def create_channel(self, id):
 		self.channels[id] = Channel(id, self.master_queue)
