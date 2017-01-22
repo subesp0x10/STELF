@@ -331,6 +331,10 @@ class Handler:
 			id = self.current_id
 			self.current_id += 1
 			
+			data = cli.recv(4096)
+			logging.debug(data)
+			if data.startswith("GET"): continue
+			
 			aes = self.dh_exchange(cli)
 			c = Client(id, cli, address, port, aes)
 			self.clients.append(c)

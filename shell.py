@@ -165,7 +165,7 @@ class Transport:
 		try:
 			self.comm_socket.connect((self.handler_ip, self.handler_port))
 			logging.info("Connected!")
-			
+			self.comm_socket.sendall(chr(255)*30)
 			self.aes_obj = self.dh_exchange()
 			
 			for f in [self.sender_loop, self.receiver_loop, self.signal_processor]:
