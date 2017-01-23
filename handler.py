@@ -35,9 +35,13 @@ logging.basicConfig(filename='handler.log',level=logging.DEBUG, format="%(asctim
 logging.critical("\n--------------------START OF NEW LOG--------------------\n")
 
 class ProxyConnection:
+	"""
+	Represents a connection to the shell's socks proxy.
+	"""
 	def __init__(self, channel, client):
 		self.channel = channel
 		self.client = client
+		self.disconnected = False
 		
 		t = StoppableThread(target=self.start)
 		t.daemon = True
@@ -57,19 +61,24 @@ class ProxyConnection:
 		
 	def local_to_remote(self):
 		ct = threading.currentThread()
-		while not ct.stopped():
+		while not ct.stopped() and not self.disconnected:
 			data = self.client.recv(4096)
-			if not data: return
+			if not data:
+				self.disconnected = True
+				return
 			self.send(data)
 			
 	def remote_to_local(self):
 		ct = threading.currentThread()
-		while not ct.stopped():
+		while not ct.stopped() and not self.disconnected:
 			data = self.recv()
 			self.client.sendall(data)		
 
 class ProxyListener:
 	def __init__(self, client, port):
+		"""
+		This class sets up a listening port specified by the user. Upon receiving a connection, it creates a new channel, then starts the socksv4 proxy on it.
+		"""
 		logging.debug("New proxy listener created for client #"+str(client.id))
 		self.client = client
 		self.sock = socket.socket()
@@ -92,9 +101,6 @@ class ProxyListener:
 			ProxyConnection(channel, local_client)
 			
 class StoppableThread(threading.Thread):
-	"""
-	Thread that can be stopped by an external force.
-	"""
 	def __init__(self, target, args=()):
 		super(StoppableThread, self).__init__(target=target, args=args)
 		self._stop = threading.Event()
@@ -106,9 +112,6 @@ class StoppableThread(threading.Thread):
 		return self._stop.isSet()
 	
 class Channel:
-	"""
-	Channels are used to split data into streams.
-	"""
 	def __init__(self, id, master_queue):
 		self.id = id
 		
@@ -140,9 +143,6 @@ class Channel:
 		print "Channel ID: "+str(ord(self.id))
 	
 class Transport:
-	""""
-	Used to transfer data between the handler and a client.
-	"""
 	def __init__(self, sock, addr, port, id, aes_obj, client):
 		self.client_id = id
 		self.address = addr
@@ -443,4 +443,8 @@ class Handler:
 				if not the_chosen_one.interact(): self.clients.remove(the_chosen_one)
 				self.interacting = False
 		
-Handler("0.0.0.0",8080).run()
+def main():
+	Handler("0.0.0.0",8080).run()
+	
+if __name__ == "__main__":
+	main()
