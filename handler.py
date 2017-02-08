@@ -75,10 +75,10 @@ class ProxyConnection:
 			self.client.sendall(data)		
 
 class ProxyListener:
+	"""
+	This class sets up a listening port specified by the user. Upon receiving a connection, it creates a new channel, then starts the socksv4 proxy on it.
+	"""
 	def __init__(self, client, port):
-		"""
-		This class sets up a listening port specified by the user. Upon receiving a connection, it creates a new channel, then starts the socksv4 proxy on it.
-		"""
 		logging.debug("New proxy listener created for client #"+str(client.id))
 		self.client = client
 		self.sock = socket.socket()
@@ -99,6 +99,12 @@ class ProxyListener:
 			time.sleep(0.2)
 			self.client.transport.signal("CREATE_PROXY:"+channel.id)
 			ProxyConnection(channel, local_client)
+			
+class PortForwarder:
+	def __init__(self, host, port, channel)
+		self.remote_host = host
+		self.remote_port = port
+		self.channel = channel
 			
 class StoppableThread(threading.Thread):
 	def __init__(self, target, args=()):
@@ -231,6 +237,7 @@ class Transport:
 	def create_channel(self):
 		id = chr(self.free_channel_id)
 		self.free_channel_id += 1
+		if self.free_channel_id == ord(":"): self.free_channel_id += 1 # Signal data separator
 		chan = Channel(id, self.master_queue)
 		self.channels[id] = chan
 		self.signal("CREATE_CHANNEL:"+chan.id)
@@ -312,7 +319,7 @@ class Client:
 			try:
 				user_input = raw_input()
 			except KeyboardInterrupt:
-				print INFO + "Backgrounding session."
+				print "\n" + INFO + "Backgrounding session."
 				return True
 				
 			if not user_input: continue
@@ -422,7 +429,7 @@ class Handler:
 		while True:
 			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
 			except KeyboardInterrupt:
-				print GOOD + "Bye!"
+				print "\n" + GOOD + "Bye!"
 				os._exit(0) # What is a graceful exit
 				
 			if user_input == "list" or user_input == "l":

