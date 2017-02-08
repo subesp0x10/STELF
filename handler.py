@@ -315,6 +315,9 @@ class Client:
 		logging.info("Starting interaction with client #"+str(self.id))
 		self.send("cd .")
 		cwd = self.recv()
+		if cwd == "CONN_LOST":
+			print BAD + "Client Disconnected"
+			return False			
 		sys.stdout.write(cwd)
 		
 		while True:
@@ -366,6 +369,7 @@ class Handler:
 		self.bind_addr = bind_addr
 		self.bind_port = bind_port
 		self.sock = socket.socket()
+		self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.sock.bind((bind_addr, bind_port))
 		self.sock.listen(5)
 	
