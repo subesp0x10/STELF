@@ -103,7 +103,7 @@ class ProxyListener:
 			ProxyConnection(channel, local_client)
 			
 class PortForwarder:
-	def __init__(self, host, port, channel)
+	def __init__(self, host, port, channel):
 		self.remote_host = host
 		self.remote_port = port
 		self.channel = channel

