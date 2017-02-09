@@ -453,13 +453,14 @@ class Handler:
 				
 				hostname, admin = cli.recv(4096).split("|")
 				c = Client(id, cli, address, port, aes, hostname, admin, self)
-				
+
 				for client in self.clients:
 					if client.hostname == hostname and client.ip == address and not self.interacting and self.awaiting_session:
 						print "Attaching to new session"
 						self.dup_session = c
 
 				self.clients.append(c)
+				
 				if not self.interacting and not self.awaiting_session:
 					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 					print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
@@ -467,11 +468,35 @@ class Handler:
 					sys.stdout.flush()
 			except Exception as e:
 				logging.info("A client connected, but disconnected before finishing the handshake.")
-		
+	
+        def conn_check(self):
+            ct = threading.currentThread()
+            while not ct.stopped():
+                try:
+                    for client in self.clients:
+                        client.send("PING")
+                        response = client.recv().split("\n")[0]
+
+                        if response != "PONG":
+                            sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
+                            print BAD + "STELF session " + str(client.id) + " excited\n"
+                            sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
+                            sys.stdout.flush()
+
+                            self.clients.remove(client)
+                    time.sleep(5)
+                except Exception as e:
+                    logging.info("There was an error trying to ping a client.")
+                
+                time.sleep(0.5)
+
 	def run(self):
 		t = StoppableThread(target=self.accepter)
+		cc = StoppableThread(target=self.conn_check)
 		t.daemon = True
+		cc.daemon = True
 		t.start()
+		cc.start()
 		while True:
 			if self.awaiting_session:
 				for i in range(30):
