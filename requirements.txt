@@ -2,4 +2,4 @@ pypiwin32
 pycrypto
 psutil
 pyinstaller
-pyhook
+pyHook
