@@ -713,6 +713,7 @@ portscan [hosts] [ports] - Perform a port scan on given hosts.
 proxy start - Start SOCKSv4 proxy on victim.
 persist - Add STELF to autorun.
 keylog|keyscan [start|stop|dump] - Start or stop the keylogger, or print logged keys.
+webcam [list|snap] [id] - Take a picture from the webcam
 help - This menu!
 '''
 			elif data.startswith("cd"):
