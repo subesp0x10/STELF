@@ -479,7 +479,7 @@ class Handler:
 
                         if response != "PONG":
                             sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-                            print BAD + "STELF session " + str(client.id) + " excited\n"
+                            print BAD + "STELF session " + str(client.id) + " exited\n"
                             sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
                             sys.stdout.flush()
 
