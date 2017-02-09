@@ -696,6 +696,8 @@ class Shell:
 			data = self.recv()
 			if data == "CONN_LOST":
 				return False
+			elif data == "PING":
+			    output = "PONG"
 			elif data == "help" or data == "?":
 				output = '''Commands:
 isadmin - Returns whether the current process has admin privileges.
