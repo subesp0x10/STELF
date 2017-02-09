@@ -454,7 +454,19 @@ class Handler:
 					sys.stdout.flush()
 			except Exception as e:
 				logging.info("A client connected, but disconnected before finishing the handshake.")
-		
+	
+        def conn_check(self):
+            ct = threading.currentThread()
+            while not ct.stopped():
+                try:
+                    for client in self.clients:
+                        client.send("PING")
+                        response = client.recv()
+
+                        if response != "PONG":
+                            print "Session " + str(client.id) + " excited"
+                            self.clients.remove(client.id)
+
 	def run(self):
 		t = StoppableThread(target=self.accepter)
 		t.daemon = True
