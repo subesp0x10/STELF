@@ -418,6 +418,9 @@ class Handler:
 		self.awaiting_session = False
 		self.session_on_hold = None
 		
+		with open("stelf.guid","rb") as f:
+			self.auth_key = f.read()
+		
 	def dh_exchange(self, client):
 		modulus = 0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA237327FFFFFFFFFFFFFFFF
 		base = 2
@@ -431,7 +434,7 @@ class Handler:
 		
 		sharedSecret = pow(int(client_key), private_key, modulus)
 		
-		hash = str(hashlib.sha256(str(sharedSecret)).hexdigest())
+		hash = str(hashlib.sha256(str(str(sharedSecret)+str(self.auth_key)+str(client.getpeername()[1]))).hexdigest())
 		key = hash[:32]
 		IV = hash[-16:]
 		
@@ -472,6 +475,7 @@ class Handler:
 					sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 					sys.stdout.flush()
 			except Exception as e:
+				print e
 				logging.info("A client connected, but disconnected before finishing the handshake.")
 	
 	def conn_check(self):
@@ -554,5 +558,10 @@ class Handler:
 					if self.awaiting_session:
 						self.session_on_hold = the_chosen_one
 				self.interacting = False
+				
+if not os.path.isfile("stelf.guid"):
+	print_info("Generating secret for authentication, it will be stored in 'stelf.guid'")
+	with open("stelf.guid", "wb") as f:
+		f.write(hashlib.sha512(str(random.randrange(10**100, (10**101)-1))).hexdigest()[:30])
 		
 handler = Handler("0.0.0.0",8080).run()
