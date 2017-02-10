@@ -639,10 +639,10 @@ class Networking:
 					for c in range(a, b+1):
 						host_list.append(host_range+"."+str(c))
 		except Exception as e:
-			return "Invalid host range"
+			return "[-]Invalid host range"
 			
 		if not host_list or host_list[0] == []:
-			return "Invalid host range"
+			return "[-]Invalid host range"
 				
 		threads = []
 		for host in host_list:
