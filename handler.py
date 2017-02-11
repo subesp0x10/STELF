@@ -240,6 +240,11 @@ class Transport:
 			elif signal == "NEW_SESH":
 				self.user_channel.write_input("AWAIT_NEW_SESH")
 				
+			elif signal.startswith("STATUS"):
+				status = ":".join(signal.split(":")[1:])
+				status = status.replace("[-]", BAD).replace("[+]", GOOD).replace("[*]", INFO)
+				print status
+				
 	def signal(self, data):
 		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data[:100])
 		self.master_queue.put(self.signal_channel.id+data)
@@ -354,7 +359,7 @@ class Client:
 				user_input = raw_input()
 			except KeyboardInterrupt:
 				print ""
-				print print_info("Backgrounding session.")
+				print_info("Backgrounding session.")
 				return True
 				
 			if not user_input: continue
@@ -475,7 +480,6 @@ class Handler:
 					sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 					sys.stdout.flush()
 			except Exception as e:
-				print e
 				logging.info("A client connected, but disconnected before finishing the handshake.")
 	
 	def conn_check(self):

