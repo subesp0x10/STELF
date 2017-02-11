@@ -286,24 +286,23 @@ class Client:
 		
 	def download(self, path):
 		logging.info("Starting download of file: "+path)
-		ch = self.transport.create_channel()
-		time.sleep(1)
-		self.transport.signal("DOWNLOAD_FILE:"+ch.id+":"+path)
-		
+
 		with open(path, "wb") as f:
 			print_info("Starting download...")
-			data = ch.read_input()
+			data = base64.b64decode(self.recv())
 			if data.startswith("Error:"):
 				logging.error("Could not download file: "+data)
 				print_bad(data)
-			elif data == chr(255):
-				logging.info("File is empty.")
-				print_info("File is empty.")
+
 			else:
 				f.write(data)
 				while True:
-					data = ch.read_input()
-					if data == chr(255): break
+					data = base64.b64decode(self.recv())
+					if data.endswith(chr(255)):
+						data = data[:-1]
+						if not data: break
+						f.write(data)
+						break
 					f.write(data)
 				logging.info("Download complete.")
 				print_good("Download complete!")
@@ -312,21 +311,18 @@ class Client:
 		logging.info("Starting upload of file: "+path)
 		if not os.path.isfile(path):
 			print_bad("No such file: "+path)
+			self.send(base64.b64decode(chr(255)))
 			return
-			
-		ch = self.transport.create_channel()
-		time.sleep(1)
-		self.transport.signal("UPLOAD_FILE:"+ch.id+":"+path)
 
 		with open(path, "rb") as f:
 			while True:
 				data = f.read(8192)
 				if not data: break
-				ch.write_output(data)
+				self.send(base64.b64encode(data))
 				time.sleep(0.1)
-		time.sleep(2)
-		ch.write_output(chr(255)*50)
-		time.sleep(5)
+
+		self.send(base64.b64encode(chr(255)))
+		print_good("Upload complete!")
 		
 	def display_snap(self):
 		data = ""
@@ -374,11 +370,12 @@ class Client:
 					print_bad("Invalid argument")
 					
 			if user_input.startswith("download"):
-				#self.send(user_input)
+				self.send(user_input)
 				self.download(user_input.split()[1])
 				user_input = "cd ."
 				
 			if user_input.startswith("upload"):
+				self.send(user_input)
 				self.upload(user_input.split()[1])
 				user_input = "cd ."
 				
