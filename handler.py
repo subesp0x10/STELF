@@ -235,7 +235,8 @@ class Transport:
 			signal = self.signal_channel.read_input()
 			logging.info("Got signal: "+signal[:100])
 			if signal == "CREATE_CHANNEL":
-				pass
+				id = signal.split(":")[1]
+				self.create_channel(id)
 				
 			elif signal == "NEW_SESH":
 				self.user_channel.write_input("AWAIT_NEW_SESH")
@@ -249,14 +250,17 @@ class Transport:
 		logging.debug("Sending signal to client #"+str(self.client_id)+": "+data[:100])
 		self.master_queue.put(self.signal_channel.id+data)
 				
-	def create_channel(self):
-		id = chr(self.free_channel_id)
-		self.free_channel_id += 1
-		if self.free_channel_id == ord(":"): self.free_channel_id += 1 # Signal data separator
-		chan = Channel(id, self.master_queue)
-		self.channels[id] = chan
-		self.signal("CREATE_CHANNEL:"+chan.id)
-		return chan
+	def create_channel(self, id=None):
+		if not id:
+			id = chr(self.free_channel_id)
+			self.free_channel_id += 1
+			if self.free_channel_id == ord(":"): self.free_channel_id += 1 # Signal data separator
+			chan = Channel(id, self.master_queue)
+			self.channels[id] = chan
+			self.signal("CREATE_CHANNEL:"+chan.id)
+			return chan
+		else:
+			self.channels[id] = Channel(id, self.master_queue)
 		
 		
 class Client:

