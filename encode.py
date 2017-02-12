@@ -38,7 +38,7 @@ except OSError as exc:
         raise
 		
 if not os.path.isfile("stelf.guid"):
-	print_info("Generating secret for authentication, it will be stored in 'stelf.guid'")
+	print "Generating secret for authentication, it will be stored in 'stelf.guid'"
 	with open("stelf.guid", "wb") as f:
 		f.write(hashlib.sha512(str(random.randrange(10**100, (10**101)-1))).hexdigest()[:30])
 
