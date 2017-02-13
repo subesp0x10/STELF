@@ -1,5 +1,6 @@
 import os
 import threading
+import logging
 
 def windows_only(func):
 	"""

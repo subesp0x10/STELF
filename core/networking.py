@@ -1,3 +1,9 @@
+import logging
+import Queue
+import threading
+import socket
+from Crypto.Random import random # Already imported elsewhere so might as well use it
+
 class Networking:
 	"""
 	Network discovery, port scans, etc.
@@ -6,12 +12,12 @@ class Networking:
 		self.shell = None
 		
 	def scan_host(self, host, ports, q):
-		#logging.debug("Starting portscan of host "+host+", ports: "+str(ports))
+		logging.debug("Starting portscan of host "+host+", ports: "+str(ports))
 		random.shuffle(ports)
 		for port in ports:
 			try:
 				s = socket.socket()
-				s.settimeout(0.7)
+				s.settimeout(0.25)
 				s.connect((host, int(port)))
 				q.put((host, port))
 			except:

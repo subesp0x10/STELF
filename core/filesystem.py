@@ -1,5 +1,6 @@
 import os
 import base64
+import logging
 
 class Filesystem:
 	"""
@@ -16,7 +17,7 @@ class Filesystem:
 			return str(e)
 			
 	def download(self, path, channel):
-		##logging.info("Starting download of file: "+path)
+		logging.info("Starting download of file: "+path)
 		try:
 			with open(path, "rb") as f:
 				while True:
@@ -33,7 +34,7 @@ class Filesystem:
 		return ""
 			
 	def upload(self, path, channel):
-		##logging.info("Starting upload of file: "+path)
+		logging.info("Starting upload of file: "+path)
 		
 		with open(path, "wb") as f:
 			while True:
@@ -46,7 +47,7 @@ class Filesystem:
 					f.write(data)
 					break
 				f.write(data)
-			##logging.info("Upload complete.")
+			logging.info("Upload complete.")
 			return ""
 			
 fs = Filesystem()

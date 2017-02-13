@@ -501,7 +501,7 @@ class Handler:
 
 						if response != "PONG":
 							sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-							print_bad("STELF session " + str(client.id) + " exited\n")
+							print_bad("STELF session " + str(client.id) + " disconnected.\n")
 							sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 							sys.stdout.flush()
 
@@ -570,6 +570,17 @@ class Handler:
 					if self.awaiting_session:
 						self.session_on_hold = the_chosen_one
 				self.interacting = False
+				
+#  ___  _____  ___  _     ___ 
+# / __| _   _|  __|  |   | __|
+# \__ \  | |  | _||  |__ | _| 
+# |___/  |_|  |___| ____ | _|  
+                         
+				
+print Style.BRIGHT+Fore.YELLOW+r"  ____"+Fore.GREEN+ r"______"+Fore.RED+ r"___"+Fore.MAGENTA+r" __   "+Fore.BLUE+" ___ "+Style.RESET_ALL+"   /\\"
+print Style.BRIGHT+Fore.YELLOW+r" / __|"+Fore.GREEN+ r"_   _|"+Fore.RED+ r" __|"+Fore.MAGENTA+r"  |"+Fore.BLUE+"  | __|"+Style.RESET_ALL+"  /__\\"
+print Style.BRIGHT+Fore.YELLOW+" \\__ \\"+Fore.GREEN+r" | | "+Fore.RED+ r"| __|"+Fore.MAGENTA+r"  |__"+Fore.BLUE+"| _| "+Style.RESET_ALL+" /\\  /\\"
+print Style.BRIGHT+Fore.YELLOW+r" |___/"+Fore.GREEN+ r" |_| "+Fore.RED+ r"|___|"+Fore.MAGENTA+r"____|"+Fore.BLUE+"|_|  "+Style.RESET_ALL+"/__\\/__\\"
 				
 if not os.path.isfile("stelf.guid"):
 	print_info("Generating secret for authentication, it will be stored in 'stelf.guid'")

