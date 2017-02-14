@@ -74,7 +74,7 @@ class Transport:
 		try:
 			self.comm_socket.connect((self.handler_ip, self.handler_port))
 			logging.info("Connected!")
-			self.comm_socket.sendall(chr(255)*30)
+			self.comm_socket.sendall("NOT A GET REQUEST")
 			time.sleep(random.randint(100,500)/100) # Waiting a random amount of time since multiple clients
 			self.aes_obj = self.dh_exchange() # connecting at the exact same time causes the handler to hang
 			
