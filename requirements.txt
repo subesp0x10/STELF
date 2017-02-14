@@ -3,3 +3,5 @@ pycrypto
 psutil
 pyinstaller
 pyscreenshot
+browsercookies
+pysqlite

