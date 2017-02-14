@@ -3,6 +3,7 @@ import ctypes
 from execute import execute
 from common import *
 import logging
+import win32net
 
 class Miscellaneous:
 	"""
