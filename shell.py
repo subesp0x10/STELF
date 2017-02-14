@@ -1,3 +1,5 @@
+import getpass
+
 from core.misc import misc
 from core.execute import execute
 from core.filesystem import fs
@@ -6,14 +8,12 @@ from core.information import info
 from core.networking import net
 from core.common import *
 
-simple import getpass
-
 from core.communication import Transport
 
 import sys
 import logging
 import time
-	
+
 if sys.stdout.isatty():
 	logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 else:
