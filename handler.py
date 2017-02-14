@@ -15,6 +15,7 @@ import zlib
 import base64
 import hashlib
 from PIL import Image
+import argparse
 
 import __builtin__ 
 
@@ -40,6 +41,11 @@ def print_good(data): print GOOD + data
 
 logging.basicConfig(filename='handler.log',level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 logging.critical("\n--------------------START OF NEW LOG--------------------\n")
+
+parser = argparse.ArgumentParser(description='Awesome shell')
+parser.add_argument('-l','--lhost', metavar='<address>', help='address to listen on', action='store', default="0.0.0.0")
+parser.add_argument('-p','--port', metavar='<port>', help='port to listen on', action='store', default=8080, type=int)
+args = parser.parse_args()
 
 class ProxyConnection:
 	"""
@@ -571,20 +577,20 @@ class Handler:
 						self.session_on_hold = the_chosen_one
 				self.interacting = False
 				
-#  ___  _____  ___  _     ___ 
-# / __| _   _|  __|  |   | __|
-# \__ \  | |  | _||  |__ | _| 
-# |___/  |_|  |___| ____ | _|  
-                         
-				
-print Style.BRIGHT+Fore.YELLOW+r"  ____"+Fore.GREEN+ r"______"+Fore.RED+ r"___"+Fore.MAGENTA+r" __   "+Fore.BLUE+" ___ "+Style.RESET_ALL+"   /\\"
-print Style.BRIGHT+Fore.YELLOW+r" / __|"+Fore.GREEN+ r"_   _|"+Fore.RED+ r" __|"+Fore.MAGENTA+r"  |"+Fore.BLUE+"  | __|"+Style.RESET_ALL+"  /__\\"
-print Style.BRIGHT+Fore.YELLOW+" \\__ \\"+Fore.GREEN+r" | | "+Fore.RED+ r"| __|"+Fore.MAGENTA+r"  |__"+Fore.BLUE+"| _| "+Style.RESET_ALL+" /\\  /\\"
-print Style.BRIGHT+Fore.YELLOW+r" |___/"+Fore.GREEN+ r" |_| "+Fore.RED+ r"|___|"+Fore.MAGENTA+r"____|"+Fore.BLUE+"|_|  "+Style.RESET_ALL+"/__\\/__\\"
+			elif user_input == "help":
+				print_info("Available commands:")
+				print "(i)nteract [id] - Interact with client."
+				print "(l)ist - Print list of clients."
+print ""	
+print Style.BRIGHT+Fore.RED+r"  ____"+ r"______"+r"___"+ r" __   "+" ___ "+Style.RESET_ALL+"   /\\"
+print Style.BRIGHT+Fore.RED+r" / __|"+ r"_   _|"+r" __|"+ r"  |"+"  | __|"+Style.RESET_ALL+"  /__\\"
+print Style.BRIGHT+Fore.RED+" \\__ \\"+r" | | "+r"| __|"+ r"  |__"+"| _| "+Style.RESET_ALL+" /\\  /\\"
+print Style.BRIGHT+Fore.RED+r" |___/"+ r" |_| "+r"|___|"+ r"____|"+"|_|  "+Style.RESET_ALL+"/__\\/__\\"
+print Style.RESET_ALL
 				
 if not os.path.isfile("stelf.guid"):
 	print_info("Generating secret for authentication, it will be stored in 'stelf.guid'")
 	with open("stelf.guid", "wb") as f:
 		f.write(hashlib.sha512(str(random.randrange(10**100, (10**101)-1))).hexdigest()[:30])
 		
-handler = Handler("0.0.0.0",8080).run()
+handler = Handler(args.lhost,args.port).run()
