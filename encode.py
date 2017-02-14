@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 
-import sys, shutil, errno, os, BaseHTTPServer
+import sys, shutil, errno, os, BaseHTTPServer, hashlib
+from Crypto.Random import random
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
 try:
