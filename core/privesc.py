@@ -3,6 +3,8 @@ from execute import execute
 import logging
 import getpass
 from common import *
+import sys
+import time
 
 class Privilege_Escalation:
 	"""
