@@ -163,8 +163,8 @@ class Transport:
 				logging.debug("Received data from handler: "+data.strip()[:100])
 				self.channels[identifier].write_input(data)
 			except Exception as e:
-				try: passlogging.warn("Received data with invalid identifier "+str(ord(identifier))+": "+data.strip())
-				except: passlogging.critical("Something went very, very wrong.")
+				try: logging.warn("Received data with invalid identifier "+str(ord(identifier))+": "+data.strip())
+				except: logging.critical("Something went very, very wrong.")
 				
 	def signal_processor(self):
 		ct = threading.currentThread()
