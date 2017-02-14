@@ -4,6 +4,10 @@ from execute import execute
 from common import *
 import logging
 import win32net
+import sys
+from Crypto.Random import random
+import string
+import subprocess
 
 class Miscellaneous:
 	"""
