@@ -6,6 +6,8 @@ from core.information import info
 from core.networking import net
 from core.common import *
 
+simple import getpass
+
 from core.communication import Transport
 
 import sys
