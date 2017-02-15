@@ -355,7 +355,7 @@ class Client:
 		cookies = self.recv().split(chr(1))[0]
 		with open("cookies_"+self.hostname, "w") as f:
 			f.write(cookies)
-			
+		print_good("Cookies saved locally to cookies_"+self.hostname)
 		return
 
 	def interact(self):
