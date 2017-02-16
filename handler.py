@@ -544,9 +544,11 @@ class Handler:
 						self.session_on_hold = None
 						self.awaiting_session = False
 						print_good("Starting interaction with session "+str(self.dup_session.id))
-						self.dup_session.interact()
+						if not self.dup_session.interact():
+							self.clients.remove(self.dup_session)
 						self.dup_session.interacting = False
 						self.dup_session = None
+						break
 					else: time.sleep(1)
 				
 				if not self.interacting:
