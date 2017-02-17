@@ -4,7 +4,7 @@ import threading
 import socket
 from Crypto.Random import random # Already imported elsewhere so might as well use it
 from common import *
-import psexec
+#import psexec
 import ntpath
 import sys
 
