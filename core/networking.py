@@ -27,9 +27,8 @@ class Networking:
 			except:
 				continue
 				
-	def portscan(self, a):
+	def portscan(self, hosts, ports):
 		q = Queue.Queue()
-		hosts, ports = a.split()
 		host_list = []
 		port_list = []
 		for i in ports.split(","):
