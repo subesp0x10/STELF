@@ -494,7 +494,7 @@ class Handler:
 
 				for client in self.clients:
 					if client.hostname == hostname and client.ip == address and not self.interacting and self.awaiting_session:
-						print "Attaching to new session"
+						print_good("Attaching to new session")
 						self.dup_session = c
 
 				self.clients.append(c)
@@ -538,15 +538,17 @@ class Handler:
 		cc.start()
 		while True:
 			if self.awaiting_session:
-				for i in range(30):
+				for i in range(90):
 					if self.dup_session:
 						self.interacting = True
 						self.session_on_hold = None
 						self.awaiting_session = False
 						print_good("Starting interaction with session "+str(self.dup_session.id))
-						self.dup_session.interact()
+						if not self.dup_session.interact():
+							self.clients.remove(self.dup_session)
 						self.dup_session.interacting = False
 						self.dup_session = None
+						break
 					else: time.sleep(1)
 				
 				if not self.interacting:
