@@ -502,7 +502,7 @@ class Handler:
 				if not self.interacting and not self.awaiting_session:
 					sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 					print_info("STELF session "+str(c.id)+" opened ("+address+":"+str(port)+" -> "+self.bind_addr+":"+str(self.bind_port)+")\n")
-					sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
+					sys.stdout.write(Style.BRIGHT + Fore.RED + "stelf" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 					sys.stdout.flush()
 			except Exception as e:
 				logging.info("A client connected, but disconnected before finishing the handshake.")
@@ -519,7 +519,7 @@ class Handler:
 						if response != "PONG":
 							sys.stdout.write('\r'+' '*(len(readline.get_line_buffer())+2)+'\r')
 							print_bad("STELF session " + str(client.id) + " disconnected.\n")
-							sys.stdout.write(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
+							sys.stdout.write(Style.BRIGHT + Fore.RED + "stelf" + Style.RESET_ALL + ">> " + readline.get_line_buffer())
 							sys.stdout.flush()
 
 							self.clients.remove(client)
@@ -562,7 +562,7 @@ class Handler:
 				self.interacting = False
 				continue
 				
-			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "handler" + Style.RESET_ALL + ">> ")
+			try: user_input = raw_input(Style.BRIGHT + Fore.RED + "stelf" + Style.RESET_ALL + ">> ")
 			except KeyboardInterrupt:
 				print "\n" + GOOD + "Bye!"
 				os._exit(0) # What is a graceful exit
