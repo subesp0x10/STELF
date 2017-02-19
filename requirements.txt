@@ -1,7 +1,8 @@
-pypiwin32
-pycrypto
-psutil
-pyinstaller
-pyscreenshot
-browsercookies
-pysqlite
+pycrypto==2.6.1
+psutil==5.1.3
+pyinstaller==3.2.1
+pyscreenshot==0.4.2
+browsercookie==0.6.3
+pysqlite==2.8.3
+bandit==1.4.0
+flake8==3.3.0
