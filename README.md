@@ -29,6 +29,9 @@ Rejoice
 - Install [Microsoft Visual C++ 9.0](https://download.microsoft.com/download/7/9/6/796EF2E4-801B-4FC4-AB28-B59FBF6D907B/VCForPython27.msi)
 - pip install -r requirements.txt
 
+##### Caveats
+- `pypiwin32` is a Windows-only dep, so it was omitted from requirements.txt. If you are on windows and are using a section of the code that requires it, please `pip install -U pypiwin32` yourself.
+
 ##### Compile the shell manually:
 
 ```
