@@ -17,6 +17,8 @@ import hashlib
 from PIL import Image
 import json
 import argparse
+import signal
+import sys
 
 import __builtin__ 
 
@@ -26,6 +28,7 @@ def raw_input2(prompt=''):
 	except EOFError as exc: 
 		time.sleep(0.05) 
 		raise 
+
 
 raw_input1 = raw_input 
 __builtin__.raw_input = raw_input2
@@ -72,7 +75,6 @@ class ProxyConnection:
 		
 	def recv(self):
 		return self.channel.read_input()
-		
 	def local_to_remote(self):
 		ct = threading.currentThread()
 		while not ct.stopped() and not self.disconnected:
@@ -149,7 +151,7 @@ class Channel:
 			data = self.input_queue.get(blocking)
 			logging.debug("Data read from channel #"+str(ord(self.id))+" input: "+data.strip()[:100])
 			return data
-		except Queue.Empty: return None
+                except Queue.Empty: return None
 		
 	def write_output(self, data): # This function is used to send data to the handler.
 		logging.debug("Data written into channel #"+str(ord(self.id))+" output: "+data.strip()[:100])
@@ -371,6 +373,7 @@ class Client:
 		while True:
 			try:
 				user_input = raw_input()
+				print "0"
 			except KeyboardInterrupt:
 				print ""
 				print_info("Backgrounding session.")
@@ -411,10 +414,10 @@ class Client:
 				self.send(user_input)
 				self.save_cookies()
 				user_input = "cd ."
-
+			    
 			self.send(user_input)
-			
 			data = self.recv()
+
 			logging.debug("Result of user input: "+data)
 			if data == "CONN_LOST":
 				print_bad("Client Disconnected")
