@@ -336,7 +336,8 @@ class Client:
 
 		self.send(base64.b64encode(chr(255)))
 		print_good("Upload complete!")
-		
+	        
+	        return
 	def display_snap(self, screenie=False):
 		data = ""
 		while not data.endswith(">>"):

